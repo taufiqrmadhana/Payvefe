@@ -1,4 +1,4 @@
-import { ArrowRight, Play, Zap, TrendingDown, FileWarning, Clock, Shield, Wallet, Users, ChevronRight } from 'lucide-react';
+import { ArrowRight, Play, Zap, TrendingDown, FileWarning, Clock, Shield, Wallet, Users, ChevronRight, LogIn } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 
 interface PayveLandingProps {
@@ -8,8 +8,49 @@ interface PayveLandingProps {
 export function PayveLanding({ onNavigate }: PayveLandingProps) {
   return (
     <div className="min-h-screen bg-slate-950 overflow-x-hidden">
+      {/* Fixed Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <div className="text-xl font-bold text-white">Payve</div>
+              <div className="text-xs text-cyan-400 font-semibold">Powered by Base</div>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-slate-300 hover:text-white transition-colors font-medium">Features</a>
+            <a href="#how-it-works" className="text-slate-300 hover:text-white transition-colors font-medium">How It Works</a>
+            <a href="#pricing" className="text-slate-300 hover:text-white transition-colors font-medium">Pricing</a>
+          </nav>
+
+          {/* CTA Buttons */}
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => onNavigate('authentication')}
+              variant="ghost"
+              className="h-10 px-5 text-white hover:bg-white/10 border border-white/20 rounded-lg font-semibold"
+            >
+              <LogIn className="w-4 h-4 mr-2" />
+              Login
+            </Button>
+            <Button 
+              onClick={() => onNavigate('authentication')}
+              className="h-10 px-5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg font-semibold shadow-lg shadow-cyan-500/30"
+            >
+              Start Free Trial
+            </Button>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center overflow-hidden">
+      <section className="relative min-h-screen flex items-center overflow-hidden pt-20">{/* Added pt-20 for header spacing */}
         {/* Dark Gradient Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"></div>
         
@@ -179,8 +220,53 @@ export function PayveLanding({ onNavigate }: PayveLandingProps) {
             <div className="md:col-span-2 p-8 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-lg">
               <h3 className="text-2xl font-bold text-white mb-3">Execute Global Payroll in One Click</h3>
               <p className="text-slate-400 mb-6">Pay 1000 employees across 50 countries. Smart contracts handle distribution, compliance, and notifications.</p>
-              <div className="h-48 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl flex items-center justify-center text-slate-500 border border-white/10">
-                Dashboard Preview
+              
+              {/* Real Dashboard Preview */}
+              <div className="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl p-6 border border-white/10">
+                {/* Top Stats */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <div className="text-blue-400 text-xs font-semibold mb-1">TOTAL EMPLOYEES</div>
+                    <div className="text-white text-2xl font-bold">75</div>
+                  </div>
+                  <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                    <div className="text-emerald-400 text-xs font-semibold mb-1">MONTHLY PAYROLL</div>
+                    <div className="text-white text-2xl font-bold">$32.4K</div>
+                  </div>
+                  <div className="p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                    <div className="text-cyan-400 text-xs font-semibold mb-1">NEXT PAYMENT</div>
+                    <div className="text-white text-2xl font-bold">5 days</div>
+                  </div>
+                </div>
+
+                {/* Employee List Preview */}
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-slate-600/30 rounded-lg">
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${
+                        i === 1 ? 'from-blue-500 to-cyan-500' : 
+                        i === 2 ? 'from-purple-500 to-pink-500' : 
+                        'from-emerald-500 to-green-500'
+                      }`}></div>
+                      <div className="flex-1">
+                        <div className="text-white text-sm font-medium">Employee {i}</div>
+                        <div className="text-slate-400 text-xs">Indonesia</div>
+                      </div>
+                      <div className="text-white font-semibold text-sm">$520</div>
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Execute Button Preview */}
+                <button className="w-full mt-4 h-10 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Execute Payroll
+                </button>
               </div>
             </div>
 

@@ -1,6 +1,7 @@
 import { ArrowLeft, Calendar, Users, Wallet, Zap, CheckCircle, Clock, Database, Bell, Send, Code, Shield, Copy, ExternalLink, Download, TrendingDown } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { useState, useEffect } from 'react';
+import { Sidebar } from '@/app/components/Sidebar';
 
 interface PayvePayrollExecutionProps {
   onNavigate: (page: string) => void;
@@ -45,59 +46,58 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
 
   if (stage === 'review') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 relative overflow-hidden">
-        {/* Animated Background */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-400 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-400 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        </div>
+      <div className="flex min-h-screen bg-slate-950">
+        <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} />
 
-        <div className="relative z-10">
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
           {/* Header */}
-          <div className="px-8 py-6">
-            <button 
-              onClick={() => onNavigate('dashboard')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back to Dashboard
-            </button>
-          </div>
+          <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
+            <div className="px-8 py-6">
+              <div className="flex items-center justify-between">
+                {/* Left: Title */}
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Payroll Execution</h1>
+                  <p className="text-sm text-slate-400 mt-1">January 2026 Cycle</p>
+                </div>
+              </div>
+            </div>
+          </header>
 
           {/* Progress Bar */}
-          <div className="px-8 mb-12">
+          <div className="px-8 py-8 bg-slate-900/50">{/* Moved out of header */}
             <div className="max-w-4xl mx-auto flex items-center justify-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-blue-600" />
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 border-2 border-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-500/50">
+                  <CheckCircle className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-white font-semibold">Review</span>
               </div>
               <div className="w-16 h-1 bg-white/30"></div>
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-white/30"></div>
+                <div className="w-10 h-10 rounded-full bg-white/30 border-2 border-white/20"></div>
                 <span className="text-white/60">Confirm</span>
               </div>
               <div className="w-16 h-1 bg-white/30"></div>
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-white/30"></div>
+                <div className="w-10 h-10 rounded-full bg-white/30 border-2 border-white/20"></div>
                 <span className="text-white/60">Execute</span>
               </div>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="max-w-5xl mx-auto px-8 pb-12">
-            <div className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
+          <div className="max-w-5xl mx-auto px-8 py-8 pb-12">
+            <div className="bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
               {/* Header */}
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
                   <Calendar className="w-8 h-8 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                  <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{/* Changed h1 to h2 */}
                     January 2026 Payroll
-                  </h1>
+                  </h2>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm font-medium border border-blue-500/30">
                       January 25, 2026 • 14:00 UTC
@@ -199,7 +199,7 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     );
   }

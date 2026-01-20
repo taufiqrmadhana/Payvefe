@@ -53,7 +53,7 @@ type Page =
 type ErrorType = 'insufficient-balance' | 'transaction-failed' | 'network-mismatch' | '404' | null;
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('authentication');
+  const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showTransactionDetail, setShowTransactionDetail] = useState(false);

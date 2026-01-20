@@ -21,6 +21,14 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const handleToggle = () => {
+    if (isAnimating) return;
+    setIsAnimating(true);
+    setIsCollapsed(!isCollapsed);
+    setTimeout(() => setIsAnimating(false), 300); // Match transition duration
+  };
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null },
@@ -60,7 +68,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
             </div>
             {!isCollapsed && (
               <button
-                onClick={() => setIsCollapsed(true)}
+                onClick={handleToggle}
                 className="w-8 h-8 rounded-lg bg-slate-700/50 border border-white/10 flex items-center justify-center hover:bg-slate-700 transition-all group"
               >
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors rotate-180" />
@@ -228,7 +236,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
             </div>
           ) : (
             <button
-              onClick={() => setIsCollapsed(false)}
+              onClick={handleToggle}
               className="w-full h-12 bg-slate-700/50 hover:bg-slate-700 border border-white/10 rounded-xl flex items-center justify-center transition-all"
             >
               <ChevronRight className="w-5 h-5 text-slate-400" />

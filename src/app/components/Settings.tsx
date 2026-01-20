@@ -20,37 +20,26 @@ export function Settings({ onNavigate }: SettingsProps) {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex min-h-screen bg-slate-950">
       <Sidebar currentPage="settings" onNavigate={onNavigate} />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Bar */}
-        <header className="bg-slate-800/50 backdrop-blur-xl border-b border-white/10 px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <button onClick={() => onNavigate('dashboard')} className="hover:text-cyan-400 transition-colors">Dashboard</button>
-              <span>›</span>
-              <span className="text-white">Settings</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="relative w-10 h-10 rounded-xl bg-slate-700/50 border border-white/10 flex items-center justify-center hover:bg-slate-700 transition-all">
-                <Bell className="w-5 h-5 text-slate-300" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">3</span>
-              </button>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 border-2 border-slate-700 shadow-lg"></div>
+      <main className="flex-1 overflow-y-auto">
+        {/* Header */}
+        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
+          <div className="px-8 py-6">
+            <div className="flex items-center justify-between">
+              {/* Left: Title */}
+              <div>
+                <h1 className="text-2xl font-bold text-white">Settings</h1>
+                <p className="text-sm text-slate-400 mt-1">Manage your account and preferences</p>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto p-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-              <p className="text-slate-400">Manage your account and organization preferences</p>
-            </div>
-
+        <div className="p-8">{/* Wrapped content in div */}
+          <div className="max-w-5xl mx-auto">
             {/* Tabs */}
             <div className="flex gap-2 mb-8 overflow-x-auto bg-slate-800/50 p-1 rounded-xl border border-white/10">
               {[
@@ -374,7 +363,7 @@ export function Settings({ onNavigate }: SettingsProps) {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

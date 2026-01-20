@@ -9,43 +9,53 @@ interface PayveDashboardProps {
 
 export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
   return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex min-h-screen bg-slate-950">
       {/* Sidebar */}
       <Sidebar currentPage="dashboard" onNavigate={onNavigate} />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 overflow-y-auto">
         {/* Top Bar */}
-        <header className="h-16 bg-slate-800/50 backdrop-blur-xl border-b border-white/10 px-8 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-400">Dashboard</span>
-          </div>
+        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
+          <div className="px-8 py-6">
+            <div className="flex items-center justify-between">
+              {/* Left: Title */}
+              <div>
+                <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+                <p className="text-sm text-slate-400 mt-1">Overview of your payroll operations</p>
+              </div>
 
-          <div className="flex items-center gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="text"
-                placeholder="Search employees..."
-                className="w-80 h-10 pl-10 pr-4 rounded-xl bg-slate-700/50 border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all text-white placeholder:text-slate-400"
-              />
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-700 rounded border border-white/10">⌘K</kbd>
+              {/* Right: Actions */}
+              <div className="flex items-center gap-3">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input 
+                    type="text"
+                    placeholder="Search employees..."
+                    className="w-80 h-11 pl-10 pr-12 rounded-xl bg-slate-800/50 border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all text-white placeholder:text-slate-400"
+                  />
+                  <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-700 rounded border border-white/10">⌘K</kbd>
+                </div>
+
+                {/* Notifications */}
+                <button 
+                  onClick={() => onNavigate('notifications')}
+                  className="relative w-11 h-11 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all"
+                >
+                  <Bell className="w-5 h-5 text-slate-300" />
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">3</span>
+                </button>
+
+                {/* Avatar */}
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 border-2 border-white/10 shadow-lg"></div>
+              </div>
             </div>
-
-            {/* Notifications */}
-            <button className="relative w-10 h-10 rounded-xl bg-slate-700/50 border border-white/10 flex items-center justify-center hover:bg-slate-700 transition-all">
-              <Bell className="w-5 h-5 text-slate-300" />
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">3</span>
-            </button>
-
-            {/* Avatar */}
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 border-2 border-slate-700 shadow-lg"></div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 bg-slate-950">
+        <div className="p-8">{/* Removed bg-slate-950 to avoid double background */}
           {/* Hero Card */}
           <div className="mb-8 p-8 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-600 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
@@ -194,13 +204,14 @@ export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
 
                 <div className="flex gap-3">
                   <Button 
-                    onClick={() => onNavigate('payroll-confirmation')}
-                    className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl hover:shadow-xl hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all"
+                    onClick={() => onNavigate('payroll-execution')}
+                    className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold"
                   >
                     <Zap className="w-5 h-5 mr-2" />
                     Execute Payroll
                   </Button>
-                  <Button variant="outline" className="h-12 px-6 rounded-xl border-white/20 text-white hover:bg-white/10">
+                  <Button variant="outline" className="h-12 px-6 rounded-xl border-white/20 text-white hover:bg-white/10 bg-slate-800/50">
+                    <Calendar className="w-5 h-5 mr-2" />
                     Schedule
                   </Button>
                 </div>
