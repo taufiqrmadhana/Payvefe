@@ -2,7 +2,8 @@ import { Calendar, Download, Filter, TrendingUp, TrendingDown, DollarSign, Users
 import { Button } from '@/app/components/ui/button';
 import { Flag } from '@/app/components/ui/flag';
 import { Sidebar } from '@/app/components/Sidebar';
-import { useState } from 'react';
+import { CompanyHeader } from '@/app/components/CompanyHeader';
+import { useState, useEffect } from 'react';
 
 interface ReportsProps {
   onNavigate: (page: string) => void;
@@ -10,37 +11,42 @@ interface ReportsProps {
 
 export function Reports({ onNavigate }: ReportsProps) {
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
-      <Sidebar currentPage="reports" onNavigate={onNavigate} />
+    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+      <Sidebar currentPage="reports" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       <main className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-          <div className="px-8 py-6">
-            <div className="flex items-center justify-between">
-              {/* Left: Title */}
-              <div>
-                <h1 className="text-2xl font-bold text-white">Reports & Analytics</h1>
-                <p className="text-sm text-slate-400 mt-1">Track payroll metrics and insights</p>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-3">
-                <Button className="h-11 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export All
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
+        <CompanyHeader 
+          title="Reports & Analytics"
+          subtitle="Track payroll metrics and insights"
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          isMobile={isMobile}
+          onNavigate={onNavigate}
+          showNotifications={true}
+        >
+          <Button className="h-10 sm:h-11 px-4 sm:px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold text-sm sm:text-base">
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export All</span>
+          </Button>
+        </CompanyHeader>
 
         {/* Content Area */}
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {/* Summary Cards */}
-          <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 hover:border-cyan-500/30 transition-all hover:-translate-y-1">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">

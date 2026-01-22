@@ -2,7 +2,8 @@ import { Search, Filter, Download, Plus, Mail, MoreVertical, Calendar, DollarSig
 import { Button } from '@/app/components/ui/button';
 import { Flag } from '@/app/components/ui/flag';
 import { Sidebar } from '@/app/components/Sidebar';
-import { useState } from 'react';
+import { CompanyHeader } from '@/app/components/CompanyHeader';
+import { useState, useEffect } from 'react';
 
 interface PayveEmployeeListProps {
   onNavigate: (page: string) => void;
@@ -10,6 +11,17 @@ interface PayveEmployeeListProps {
 
 export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const toggleEmployee = (id: string) => {
     setSelectedEmployees(prev => 
@@ -26,47 +38,41 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
-      <Sidebar currentPage="employee-list" onNavigate={onNavigate} />
+    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+      <Sidebar currentPage="employee-list" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       <main className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-          <div className="px-8 py-6">
-            <div className="flex items-center justify-between">
-              {/* Left: Title */}
-              <div>
-                <h1 className="text-2xl font-bold text-white">Employees</h1>
-                <p className="text-sm text-slate-400 mt-1">Manage your team and contracts</p>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-3">
-                <Button 
-                  onClick={() => onNavigate('add-employee')}
-                  className="h-11 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Add Employee
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
+        <CompanyHeader 
+          title="Employees"
+          subtitle="Manage your team and contracts"
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          isMobile={isMobile}
+          onNavigate={onNavigate}
+          showNotifications={true}
+        >
+          <Button 
+            onClick={() => onNavigate('add-employee')}
+            className="h-10 sm:h-11 px-4 sm:px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold text-sm sm:text-base"
+          >
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+            <span className="hidden sm:inline">Add Employee</span>
+          </Button>
+        </CompanyHeader>
 
         {/* Content Area */}
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {/* Action Bar */}
-          <div className="flex items-center gap-3 mb-6">{/* Moved from header */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
             {/* Search */}
-            <div className="relative">
+            <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input 
                 type="text"
                 placeholder="Search by name, email, wallet..."
-                className="w-80 h-11 pl-12 pr-4 rounded-xl bg-slate-800/50 border border-white/10 focus:border-cyan-500/50 focus:outline-none transition-all text-white placeholder:text-slate-400"
+                className="w-full h-11 pl-12 pr-4 rounded-xl bg-slate-800/50 border border-white/10 focus:border-cyan-500/50 focus:outline-none transition-all text-white placeholder:text-slate-400"
               />
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-700 rounded border border-white/10">/</kbd>
+              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-700 rounded border border-white/10 hidden sm:block">/</kbd>
             </div>
 
             {/* Filter */}
@@ -79,12 +85,13 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
             {/* Export */}
             <Button variant="outline" className="h-11 px-4 rounded-xl border-white/20 text-white hover:bg-white/10 bg-slate-800/50 backdrop-blur-sm">
               <Download className="w-4 h-4 mr-2" />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </Button>
           </div>
 
           {/* Tabs */}
-          <div className="mb-6 flex items-center gap-2 bg-slate-800/50 rounded-xl p-1 border border-white/10 inline-flex">{/* Added wrapper div */}
+          <div className="mb-6 overflow-x-auto">
+            <div className="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1 border border-white/10 inline-flex min-w-max sm:min-w-0">{/* Added wrapper div */}
             {[
               { id: 'all', label: 'All', count: 75 },
               { id: 'active', label: 'Active', count: 68 },
@@ -103,10 +110,11 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
                 {tab.label} ({tab.count})
               </button>
             ))}
+            </div>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
               { label: 'Average Salary', value: '$432' },
               { label: 'Total Monthly Cost', value: '$32,400' },

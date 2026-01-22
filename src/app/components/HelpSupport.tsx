@@ -2,7 +2,8 @@ import { Search, MessageCircle, Book, Mail, Phone, FileText, ExternalLink, Chevr
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Sidebar } from '@/app/components/Sidebar';
-import { useState } from 'react';
+import { CompanyHeader } from '@/app/components/CompanyHeader';
+import { useState, useEffect } from 'react';
 
 interface HelpSupportProps {
   onNavigate: (page: string) => void;
@@ -10,27 +11,35 @@ interface HelpSupportProps {
 
 export function HelpSupport({ onNavigate }: HelpSupportProps) {
   const [activeTab, setActiveTab] = useState('faq');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
-      <Sidebar currentPage="help-support" onNavigate={onNavigate} />
+    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+      <Sidebar currentPage="help-support" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       <main className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-          <div className="px-8 py-6">
-            <div className="flex items-center justify-between">
-              {/* Left: Title */}
-              <div>
-                <h1 className="text-2xl font-bold text-white">Help & Support</h1>
-                <p className="text-sm text-slate-400 mt-1">Get assistance and find answers</p>
-              </div>
-            </div>
-          </div>
-        </header>
+        <CompanyHeader 
+          title="Help & Support"
+          subtitle="Get assistance and find answers"
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          isMobile={isMobile}
+          onNavigate={onNavigate}
+          showNotifications={true}
+        />
 
         {/* Content Area */}
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {/* Quick Links Grid */}
           <div className="grid md:grid-cols-3 gap-6 mb-12">
             {/* Getting Started */}

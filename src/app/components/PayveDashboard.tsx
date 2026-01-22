@@ -2,76 +2,62 @@ import { LayoutDashboard, Users, DollarSign, TrendingUp, ArrowUpRight, ArrowRigh
 import { Button } from '@/app/components/ui/button';
 import { Flag } from '@/app/components/ui/flag';
 import { Sidebar } from '@/app/components/Sidebar';
+import { CompanyHeader } from '@/app/components/CompanyHeader';
+import { useState, useEffect } from 'react';
 
 interface PayveDashboardProps {
   onNavigate: (page: string) => void;
 }
 
 export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
-    <div className="flex min-h-screen bg-slate-950">
+    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
       {/* Sidebar */}
-      <Sidebar currentPage="dashboard" onNavigate={onNavigate} />
+      <Sidebar currentPage="dashboard" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-          <div className="px-8 py-6">
-            <div className="flex items-center justify-between">
-              {/* Left: Title */}
-              <div>
-                <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-                <p className="text-sm text-slate-400 mt-1">Overview of your payroll operations</p>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-3">
-                {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Search employees..."
-                    className="w-80 h-11 pl-10 pr-12 rounded-xl bg-slate-800/50 border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all text-white placeholder:text-slate-400"
-                  />
-                  <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-700 rounded border border-white/10">⌘K</kbd>
-                </div>
-
-                {/* Notifications */}
-                <button 
-                  onClick={() => onNavigate('notifications')}
-                  className="relative w-11 h-11 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all"
-                >
-                  <Bell className="w-5 h-5 text-slate-300" />
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">3</span>
-                </button>
-
-                {/* Avatar */}
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 border-2 border-white/10 shadow-lg"></div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <CompanyHeader 
+          title="Dashboard"
+          subtitle="Overview of your payroll operations"
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          isMobile={isMobile}
+          onNavigate={onNavigate}
+          showSearch={true}
+          showNotifications={true}
+        />
 
         {/* Content Area */}
-        <div className="p-8">{/* Removed bg-slate-950 to avoid double background */}
+        <div className="p-4 sm:p-8">{/* Removed bg-slate-950 to avoid double background */}
           {/* Hero Card */}
-          <div className="mb-8 p-8 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-600 relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="relative z-10 grid md:grid-cols-2 gap-8 items-center">
+          <div className="mb-6 sm:mb-8 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-600 relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-center">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Good morning, Sarah</h1>
-                <p className="text-white/80 mb-6">Your next payroll is in 3 days</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Good morning, Sarah</h1>
+                <p className="text-sm sm:text-base text-white/80 mb-4 sm:mb-6">Your next payroll is in 3 days</p>
                 <Button 
                   onClick={() => onNavigate('payroll-confirmation')}
-                  className="h-12 px-8 bg-white text-purple-700 hover:bg-white/90 font-semibold rounded-xl shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all"
+                  className="h-11 sm:h-12 px-6 sm:px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/40 hover:-translate-y-0.5 transition-all w-full md:w-auto"
                 >
                   Execute Payroll Now
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </div>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2 sm:gap-3">
                 <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   <span className="text-sm font-medium">75 employees ready</span>
@@ -89,7 +75,7 @@ export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-sm hover:shadow-xl hover:shadow-blue-500/20 hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
@@ -220,7 +206,7 @@ export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
           </div>
 
           {/* Recent Activity & Quick Actions */}
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
             <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10">
               <h3 className="font-bold text-white mb-4">Recent Transactions</h3>
               <div className="space-y-3">

@@ -2,8 +2,9 @@ import { Building2, User, CreditCard, Bell, Shield, Mail, Globe, Save, ChevronRi
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/app/components/Sidebar';
+import { CompanyHeader } from '@/app/components/CompanyHeader';
 
 interface SettingsProps {
   onNavigate: (page: string) => void;
@@ -12,6 +13,17 @@ interface SettingsProps {
 export function Settings({ onNavigate }: SettingsProps) {
   const [activeTab, setActiveTab] = useState('company');
   const [copied, setCopied] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -20,25 +32,22 @@ export function Settings({ onNavigate }: SettingsProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
-      <Sidebar currentPage="settings" onNavigate={onNavigate} />
+    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+      <Sidebar currentPage="settings" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       <main className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-          <div className="px-8 py-6">
-            <div className="flex items-center justify-between">
-              {/* Left: Title */}
-              <div>
-                <h1 className="text-2xl font-bold text-white">Settings</h1>
-                <p className="text-sm text-slate-400 mt-1">Manage your account and preferences</p>
-              </div>
-            </div>
-          </div>
-        </header>
+        <CompanyHeader 
+          title="Settings"
+          subtitle="Manage your account and preferences"
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          isMobile={isMobile}
+          onNavigate={onNavigate}
+          showNotifications={true}
+        />
 
         {/* Content Area */}
-        <div className="p-8">{/* Wrapped content in div */}
+        <div className="p-4 sm:p-8">{/* Wrapped content in div */}
           <div className="max-w-5xl mx-auto">
             {/* Tabs */}
             <div className="flex gap-2 mb-8 overflow-x-auto bg-slate-800/50 p-1 rounded-xl border border-white/10">

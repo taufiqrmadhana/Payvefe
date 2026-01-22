@@ -26,6 +26,7 @@ import { PayveDashboard } from '@/app/components/PayveDashboard';
 import { PayveEmployeeList } from '@/app/components/PayveEmployeeList';
 import { PayveAddEmployee } from '@/app/components/PayveAddEmployee';
 import { PayvePayrollExecution } from '@/app/components/PayvePayrollExecution';
+import { PayrollHistory } from '@/app/components/PayrollHistory';
 
 type Page = 
   | 'landing' 
@@ -41,6 +42,7 @@ type Page =
   | 'payroll-success'
   | 'payroll-execution'
   | 'employee-dashboard'
+  | 'payroll-history'
   | 'withdraw-modal'
   | 'mobile-employee'
   | 'settings'
@@ -118,6 +120,8 @@ export default function App() {
         return <PayvePayrollExecution onNavigate={handleNavigate} />;
       case 'employee-dashboard':
         return <EmployeeDashboard onNavigate={handleNavigate} />;
+      case 'payroll-history':
+        return <PayrollHistory onNavigate={handleNavigate} />;
       case 'mobile-employee':
         return <MobileEmployeeDashboard onNavigate={handleNavigate} />;
       case 'settings':

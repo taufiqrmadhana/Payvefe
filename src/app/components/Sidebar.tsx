@@ -10,24 +10,48 @@ import {
   Wallet,
   Building2,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Menu,
+  X
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface SidebarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
+  isMobileMenuOpen?: boolean;
+  setIsMobileMenuOpen?: (open: boolean) => void;
 }
 
-export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, isMobileMenuOpen: externalMobileMenuOpen, setIsMobileMenuOpen: externalSetMobileMenuOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  const isMobileMenuOpen = externalMobileMenuOpen !== undefined ? externalMobileMenuOpen : internalMobileMenuOpen;
+  const setIsMobileMenuOpen = externalSetMobileMenuOpen || setInternalMobileMenuOpen;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleToggle = () => {
     if (isAnimating) return;
     setIsAnimating(true);
     setIsCollapsed(!isCollapsed);
-    setTimeout(() => setIsAnimating(false), 300); // Match transition duration
+    setTimeout(() => setIsAnimating(false), 300);
   };
 
   const menuItems = [
@@ -43,12 +67,31 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
     { id: 'notifications-full', label: 'Notifications', icon: Bell, badge: '3' },
   ];
 
+  const handleMenuItemClick = (page: string) => {
+    onNavigate(page);
+    if (isMobile) {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
+  const showCompanyInfo = !isCollapsed || isMobile;
+
   return (
     <>
+      {/* Mobile Overlay */}
+      {isMobile && isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
       <aside 
-        className={`fixed left-0 top-0 h-screen bg-slate-900/50 backdrop-blur-xl border-r border-white/10 transition-all duration-300 z-40 flex flex-col ${
-          isCollapsed ? 'w-20' : 'w-72'
+        className={`fixed left-0 top-0 h-screen bg-slate-900/95 backdrop-blur-xl border-r border-white/10 transition-all duration-300 flex flex-col ${
+          isMobile 
+            ? `${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} w-72 z-50` 
+            : `${isCollapsed ? 'w-20' : 'w-72'} z-40`
         }`}
       >
         {/* Header */}
@@ -59,14 +102,14 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
                 <Zap className="w-6 h-6 text-white" />
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
               </div>
-              {!isCollapsed && (
+              {showCompanyInfo && (
                 <div>
                   <div className="text-xl font-bold text-white">Payve</div>
                   <div className="text-xs text-cyan-400 font-semibold">Company Portal</div>
                 </div>
               )}
             </div>
-            {!isCollapsed && (
+            {!isCollapsed && !isMobile && (
               <button
                 onClick={handleToggle}
                 className="w-8 h-8 rounded-lg bg-slate-700/50 border border-white/10 flex items-center justify-center hover:bg-slate-700 transition-all group"
@@ -78,7 +121,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
         </div>
 
         {/* Company Info */}
-        {!isCollapsed && (
+        {showCompanyInfo && (
           <div className="px-4 py-4 border-b border-white/10">
             <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-xl p-4 border border-cyan-500/30">
               <div className="flex items-center gap-3 mb-3">
@@ -103,7 +146,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               </div>
 
               <button 
-                onClick={() => onNavigate('settings')}
+                onClick={() => handleMenuItemClick('settings')}
                 className="w-full mt-3 h-8 bg-white/10 hover:bg-white/20 rounded-lg text-xs text-white font-semibold transition-all flex items-center justify-center gap-2"
               >
                 <Wallet className="w-3 h-3" />
@@ -123,7 +166,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               return (
                 <button
                   key={item.id}
-                  onClick={() => onNavigate(item.id)}
+                  onClick={() => handleMenuItemClick(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all group relative ${
                     isActive
                       ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
@@ -153,7 +196,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
                     </>
                   )}
 
-                  {isCollapsed && item.badge && (
+                  {isCollapsed && !isMobile && item.badge && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-slate-900">
                       {item.badge}
                     </div>
@@ -179,7 +222,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               return (
                 <button
                   key={item.id}
-                  onClick={() => onNavigate(item.id)}
+                  onClick={() => handleMenuItemClick(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all group relative ${
                     isActive
                       ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
@@ -201,7 +244,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
                     </>
                   )}
 
-                  {isCollapsed && item.badge && (
+                  {isCollapsed && !isMobile && item.badge && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-slate-900">
                       {item.badge}
                     </div>
@@ -227,7 +270,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               </div>
               
               <button
-                onClick={() => onNavigate('authentication')}
+                onClick={() => handleMenuItemClick('landing')}
                 className="w-full h-9 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm font-semibold transition-all flex items-center justify-center gap-2 group"
               >
                 <LogOut className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -235,17 +278,19 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleToggle}
-              className="w-full h-12 bg-slate-700/50 hover:bg-slate-700 border border-white/10 rounded-xl flex items-center justify-center transition-all"
-            >
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            </button>
+            !isMobile && (
+              <button
+                onClick={handleToggle}
+                className="w-full h-12 bg-slate-700/50 hover:bg-slate-700 border border-white/10 rounded-xl flex items-center justify-center transition-all"
+              >
+                <ChevronRight className="w-5 h-5 text-slate-400" />
+              </button>
+            )
           )}
         </div>
 
         {/* Powered by Base */}
-        {!isCollapsed && (
+        {showCompanyInfo && (
           <div className="px-4 pb-4">
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 text-center">
               <div className="flex items-center justify-center gap-2 mb-1">
@@ -259,7 +304,9 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       </aside>
 
       {/* Spacer for content */}
-      <div className={`${isCollapsed ? 'w-20' : 'w-72'} flex-shrink-0`}></div>
+      {!isMobile && (
+        <div className={`${isCollapsed ? 'w-20' : 'w-72'} flex-shrink-0`}></div>
+      )}
     </>
   );
 }

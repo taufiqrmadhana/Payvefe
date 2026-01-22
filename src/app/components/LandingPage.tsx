@@ -221,7 +221,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </p>
           <Button 
             onClick={() => onNavigate('hr-dashboard')}
-            className="bg-white hover:bg-gray-100 text-[#1E40AF] px-12 py-6 text-base rounded-md"
+            className="h-14 px-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all font-semibold text-base"
           >
             Get Started
             <ArrowRight className="ml-2 w-5 h-5" />

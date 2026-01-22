@@ -2,6 +2,7 @@ import { ArrowLeft, Calendar, Users, Wallet, Zap, CheckCircle, Clock, Database, 
 import { Button } from '@/app/components/ui/button';
 import { useState, useEffect } from 'react';
 import { Sidebar } from '@/app/components/Sidebar';
+import { CompanyHeader } from '@/app/components/CompanyHeader';
 
 interface PayvePayrollExecutionProps {
   onNavigate: (page: string) => void;
@@ -12,6 +13,17 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
   const [checked, setChecked] = useState({ verify: false, irreversible: false, amounts: false });
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (stage === 'executing') {
@@ -46,60 +58,57 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
 
   if (stage === 'review') {
     return (
-      <div className="flex min-h-screen bg-slate-950">
-        <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} />
+      <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+        <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
-          {/* Header */}
-          <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-            <div className="px-8 py-6">
-              <div className="flex items-center justify-between">
-                {/* Left: Title */}
-                <div>
-                  <h1 className="text-2xl font-bold text-white">Payroll Execution</h1>
-                  <p className="text-sm text-slate-400 mt-1">January 2026 Cycle</p>
-                </div>
-              </div>
-            </div>
-          </header>
+          <CompanyHeader 
+            title="Payroll Execution"
+            subtitle="January 2026 Cycle"
+            isMobileMenuOpen={isMobileMenuOpen}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+            isMobile={isMobile}
+            onNavigate={onNavigate}
+            showNotifications={true}
+          />
 
           {/* Progress Bar */}
-          <div className="px-8 py-8 bg-slate-900/50">{/* Moved out of header */}
-            <div className="max-w-4xl mx-auto flex items-center justify-center gap-4">
+          <div className="px-4 sm:px-8 py-6 sm:py-8 bg-slate-900/50">{/* Moved out of header */}
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 border-2 border-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-500/50">
-                  <CheckCircle className="w-6 h-6 text-white" />
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <span className="text-white font-semibold">Review</span>
+                <span className="text-white font-semibold text-sm sm:text-base">Review</span>
               </div>
-              <div className="w-16 h-1 bg-white/30"></div>
+              <div className="w-12 h-1 sm:w-16 bg-white/30 hidden sm:block"></div>
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-white/30 border-2 border-white/20"></div>
-                <span className="text-white/60">Confirm</span>
+                <span className="text-white/60 text-sm sm:text-base">Confirm</span>
               </div>
-              <div className="w-16 h-1 bg-white/30"></div>
+              <div className="w-12 h-1 sm:w-16 bg-white/30 hidden sm:block"></div>
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-white/30 border-2 border-white/20"></div>
-                <span className="text-white/60">Execute</span>
+                <span className="text-white/60 text-sm sm:text-base">Execute</span>
               </div>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className="max-w-5xl mx-auto px-8 py-8 pb-12">
-            <div className="bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
+          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 sm:py-8 pb-12">
+            <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10">
               {/* Header */}
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
-                  <Calendar className="w-8 h-8 text-white" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 sm:mb-8">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50 flex-shrink-0">
+                  <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{/* Changed h1 to h2 */}
+                  <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{/* Changed h1 to h2 */}
                     January 2026 Payroll
                   </h2>
                   <div className="flex items-center gap-2 mt-1">
-                    <div className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm font-medium border border-blue-500/30">
+                    <div className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs sm:text-sm font-medium border border-blue-500/30">
                       January 25, 2026 • 14:00 UTC
                     </div>
                   </div>
@@ -107,7 +116,7 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
               </div>
 
               {/* Summary Grid */}
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border-2 border-blue-500/30">
                   <Users className="w-8 h-8 text-blue-400 mb-3" />
                   <div className="text-4xl font-bold text-white mb-1">75</div>
@@ -181,17 +190,17 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
               </div>
 
               {/* Actions */}
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Button 
                   onClick={() => onNavigate('dashboard')}
                   variant="outline" 
-                  className="flex-1 h-12 rounded-xl border-white/20 text-white hover:bg-white/10"
+                  className="flex-1 h-11 sm:h-12 rounded-xl border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={() => setStage('confirm')}
-                  className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold"
+                  className="flex-1 h-11 sm:h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold"
                 >
                   Continue to Confirm
                   <ArrowLeft className="w-5 h-5 ml-2 rotate-180" />
@@ -206,14 +215,14 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
 
   if (stage === 'confirm') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 flex items-center justify-center p-8">
-        <div className="max-w-2xl w-full bg-slate-800/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
-              <Shield className="w-10 h-10 text-white" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 flex items-center justify-center p-4 sm:p-8">
+        <div className="max-w-2xl w-full bg-slate-800/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10">
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
+              <Shield className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2">Confirm Payroll Execution</h2>
-            <p className="text-red-400 font-semibold">This action cannot be undone</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Confirm Payroll Execution</h2>
+            <p className="text-sm sm:text-base text-red-400 font-semibold">This action cannot be undone</p>
           </div>
 
           {/* Checklist */}
@@ -260,18 +269,18 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
           </div>
 
           {/* Actions */}
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Button 
               onClick={() => setStage('review')}
               variant="outline"
-              className="flex-1 h-14 rounded-xl border-white/20 text-white hover:bg-white/10"
+              className="flex-1 h-12 sm:h-14 rounded-xl border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
             >
               Back
             </Button>
             <Button 
               onClick={() => setStage('executing')}
               disabled={!allChecked}
-              className="flex-1 h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              className="flex-1 h-12 sm:h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
             >
               <Zap className="w-5 h-5 mr-2" />
               Execute Payroll
