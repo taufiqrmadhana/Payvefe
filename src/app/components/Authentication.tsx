@@ -1,8 +1,14 @@
-import { ArrowLeft, Mail, Chrome, Zap } from 'lucide-react';
-import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
-import { Label } from '@/app/components/ui/label';
-import { useState } from 'react';
+import { ArrowLeft, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useAccount } from 'wagmi';
+import { 
+  ConnectWallet, 
+  Wallet, 
+  WalletDropdown, 
+  WalletDropdownDisconnect, 
+  WalletDropdownLink 
+} from '@coinbase/onchainkit/wallet';
+import { Address, Avatar, Name, Identity, EthBalance } from '@coinbase/onchainkit/identity';
 
 interface AuthenticationProps {
   onNavigate: (page: string) => void;
@@ -10,21 +16,22 @@ interface AuthenticationProps {
 
 export function Authentication({ onNavigate }: AuthenticationProps) {
   const [accountType, setAccountType] = useState<'company' | 'employee'>('company');
-  const [showEmailForm, setShowEmailForm] = useState(true);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const { address, isConnected } = useAccount();
 
-  const handleLogin = () => {
-    // Hardcoded authentication
-    if (username === 'company' && password === 'company') {
-      onNavigate('dashboard');
-    } else if (username === 'employee' && password === 'employee') {
-      onNavigate('employee-dashboard');
-    } else {
-      setError('Invalid credentials. Try company/company or employee/employee');
+  useEffect(() => {
+    if (isConnected && address) {
+      // In a real app, we'd check on-chain role here.
+      // For now, we auto-redirect based on the toggle selection after a short delay
+      const timer = setTimeout(() => {
+        if (accountType === 'company') {
+          onNavigate('dashboard');
+        } else {
+          onNavigate('employee-dashboard');
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [isConnected, address, accountType, onNavigate]);
 
   return (
     <div className="min-h-screen flex bg-slate-950">
@@ -50,8 +57,8 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
 
         <div className="flex-1 flex items-center justify-center px-8 pb-16">
           <div className="w-full max-w-md">
-            <h1 className="text-3xl font-bold text-white mb-2">Sign in to Payve</h1>
-            <p className="text-slate-400 mb-8">Choose your account type</p>
+            <h1 className="text-3xl font-bold text-white mb-2">Connect to Payve</h1>
+            <p className="text-slate-400 mb-8">Access your {accountType} dashboard</p>
 
             {/* Account Type Tabs */}
             <div className="flex gap-2 mb-8 bg-slate-800/50 p-1 rounded-xl border border-white/10">
@@ -77,112 +84,44 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
               </button>
             </div>
 
-            {!showEmailForm ? (
-              <>
-                {/* Sign In Options */}
-                <div className="space-y-3 mb-6">
-                  <Button
-                    variant="outline"
-                    className="w-full h-12 justify-start gap-3 text-white border-white/20 hover:bg-white/10 rounded-xl bg-slate-800/50 backdrop-blur-sm"
-                  >
-                    <Chrome className="w-5 h-5 text-slate-300" />
-                    Continue with Google
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowEmailForm(true)}
-                    className="w-full h-12 justify-start gap-3 text-white border-white/20 hover:bg-white/10 rounded-xl bg-slate-800/50 backdrop-blur-sm"
-                  >
-                    <Mail className="w-5 h-5 text-slate-300" />
-                    Continue with Email
-                  </Button>
+            <div className="bg-slate-800/30 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-6">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Zap className="w-8 h-8 text-blue-400" />
                 </div>
+                <h3 className="text-white font-semibold text-lg mb-1">
+                  {isConnected ? 'Wallet Connected' : 'Connect Smart Wallet'}
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  {isConnected 
+                    ? 'Redirecting you to the dashboard...' 
+                    : 'Log in with FaceID, TouchID, or Email'}
+                </p>
+              </div>
 
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-slate-950 text-slate-500">or</span>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-sm text-slate-400">
-                    Don't have an account?{' '}
-                    <a href="#" className="text-cyan-400 hover:underline font-semibold">
-                      Sign up
-                    </a>
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Login Form */}
-                <div className="space-y-4 mb-6">
-                  {error && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
-                      <p className="text-sm text-red-300 text-center">{error}</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="username" className="text-sm text-slate-300 font-semibold">
-                      Username
-                    </Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="company or employee"
-                      className="h-12 bg-slate-800/50 border-white/10 text-white placeholder:text-slate-500 rounded-xl focus:border-cyan-500/50"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm text-slate-300 font-semibold">
-                      Password
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="company or employee"
-                      className="h-12 bg-slate-800/50 border-white/10 text-white placeholder:text-slate-500 rounded-xl focus:border-cyan-500/50"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleLogin}
-                    disabled={!username || !password}
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white h-12 rounded-xl font-semibold shadow-lg hover:shadow-cyan-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Sign In
-                  </Button>
-
-                  <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                    <p className="text-xs text-blue-300 text-center font-semibold mb-2">
-                      Demo Credentials:
-                    </p>
-                    <p className="text-xs text-slate-400 text-center">
-                      Company: <span className="text-cyan-400 font-mono">company / company</span>
-                    </p>
-                    <p className="text-xs text-slate-400 text-center">
-                      Employee: <span className="text-cyan-400 font-mono">employee / employee</span>
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
+              <Wallet>
+                <ConnectWallet className="w-full">
+                  <Avatar className="h-6 w-6" />
+                  <Name />
+                </ConnectWallet>
+                <WalletDropdown>
+                  <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                    <Avatar />
+                    <Name />
+                    <Address />
+                    <EthBalance />
+                  </Identity>
+                  <WalletDropdownLink icon="wallet" href="https://keys.coinbase.com">
+                    Wallet
+                  </WalletDropdownLink>
+                  <WalletDropdownDisconnect />
+                </WalletDropdown>
+              </Wallet>
+            </div>
 
             {/* Footer Links */}
             <div className="mt-12 text-center text-xs text-slate-500">
-              <a href="#" className="hover:text-slate-300 transition-colors">Terms of Service</a>
-              <span className="mx-2">•</span>
-              <a href="#" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
+              <span className="opacity-50">Powered by Coinbase OnchainKit</span>
             </div>
           </div>
         </div>

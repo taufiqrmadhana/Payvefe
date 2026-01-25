@@ -4,12 +4,14 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Checkbox } from '@/app/components/ui/checkbox';
 import { useState } from 'react';
+import { usePayve } from '@/hooks/usePayve';
 
 interface WithdrawModalProps {
   onClose: () => void;
 }
 
 export function WithdrawModal({ onClose }: WithdrawModalProps) {
+  const { withdraw } = usePayve();
   const [amount, setAmount] = useState('');
 
   const quickAmounts = [
@@ -176,6 +178,19 @@ export function WithdrawModal({ onClose }: WithdrawModalProps) {
               Cancel
             </Button>
             <Button 
+              onClick={async () => {
+                try {
+                   // Rate: 1 USD = 16,000 IDRX. Decimals: 18.
+                   // amount is in USD.
+                   const idrxAmount = BigInt(amount) * 16000n * 10n**18n;
+                   await withdraw(idrxAmount);
+                   alert("Withdrawal successful! Check your wallet.");
+                   onClose();
+                } catch (e) {
+                   console.error(e);
+                   alert("Withdrawal failed");
+                }
+              }}
               disabled={!amount || parseFloat(amount) < 10}
               className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-cyan-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
             >

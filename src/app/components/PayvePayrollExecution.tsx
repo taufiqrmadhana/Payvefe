@@ -3,6 +3,7 @@ import { Button } from '@/app/components/ui/button';
 import { useState, useEffect } from 'react';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
+import { usePayve } from '@/hooks/usePayve';
 
 interface PayvePayrollExecutionProps {
   onNavigate: (page: string) => void;
@@ -25,34 +26,30 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const { distribute } = usePayve();
+  const [isExecuting, setIsExecuting] = useState(false);
+
   useEffect(() => {
-    if (stage === 'executing') {
-      const steps = [
-        { delay: 500, step: 1 },
-        { delay: 1500, step: 2 },
-        { delay: 3000, step: 3 },
-        { delay: 5000, step: 4 },
-        { delay: 7000, step: 5 }
-      ];
-
-      steps.forEach(({ delay, step }) => {
-        setTimeout(() => setCurrentStep(step), delay);
-      });
-
-      const interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setTimeout(() => setStage('success'), 500);
-            return 100;
-          }
-          return prev + 2;
-        });
-      }, 100);
-
-      return () => clearInterval(interval);
-    }
-  }, [stage]);
+    const runPayroll = async () => {
+      if (stage === 'executing' && !isExecuting) {
+        setIsExecuting(true);
+        try {
+          setCurrentStep(1); // Preparing
+          await distribute();
+          setCurrentStep(5); // Done
+          setProgress(100);
+          setStage('success');
+        } catch (error) {
+          console.error("Payroll failed:", error);
+          alert("Payroll execution failed. See console.");
+          setStage('confirm'); // Go back
+        } finally {
+          setIsExecuting(false);
+        }
+      }
+    };
+    runPayroll();
+  }, [stage, distribute, isExecuting]);
 
   const allChecked = checked.verify && checked.irreversible && checked.amounts;
 

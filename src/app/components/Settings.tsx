@@ -3,6 +3,9 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { useState, useEffect } from 'react';
+import { useAccount, useBalance } from 'wagmi';
+import { IDRX_ADDRESS } from '@/constants';
+import { usePayve } from '@/hooks/usePayve';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 
@@ -11,6 +14,13 @@ interface SettingsProps {
 }
 
 export function Settings({ onNavigate }: SettingsProps) {
+  const { deposit } = usePayve();
+  const { address } = useAccount();
+  const { data: idrxBalance } = useBalance({
+    address: address,
+    token: IDRX_ADDRESS as `0x${string}`,
+  });
+
   const [activeTab, setActiveTab] = useState('company');
   const [copied, setCopied] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -209,35 +219,43 @@ export function Settings({ onNavigate }: SettingsProps) {
                     <div className="p-4 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl border border-cyan-500/30">
                       <div className="text-xs uppercase text-slate-300 font-semibold mb-2">Wallet Address (Base Network)</div>
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 font-mono text-sm text-white bg-slate-700/50 px-3 py-2 rounded-lg">
-                          0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
+                        <code className="flex-1 font-mono text-sm text-white bg-slate-700/50 px-3 py-2 rounded-lg break-all">
+                          {address || 'Not connected'}
                         </code>
                         <button 
-                          onClick={() => handleCopy('0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb')}
-                          className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition-all border border-white/10"
+                          onClick={() => address && handleCopy(address)}
+                          className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition-all border border-white/10 flex-shrink-0"
                         >
                           {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-slate-300" />}
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid md:grid-cols-1 gap-4">
                       <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
                         <div className="text-sm text-slate-400 mb-1">IDRX Balance</div>
-                        <div className="text-2xl font-bold text-white">500,000</div>
-                      </div>
-                      <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
-                        <div className="text-sm text-slate-400 mb-1">ETH Balance</div>
-                        <div className="text-2xl font-bold text-white">0.245</div>
-                      </div>
-                      <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
-                        <div className="text-sm text-slate-400 mb-1">Network</div>
-                        <div className="text-lg font-bold text-cyan-400">Base L2</div>
+                        <div className="text-2xl font-bold text-white">
+                            {idrxBalance ? Math.floor(parseFloat(idrxBalance.formatted)).toLocaleString() : '0'} IDRX
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex gap-3 pt-4">
-                      <Button className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-cyan-500/50">
+                      <Button 
+                          onClick={async () => {
+                              const amount = window.prompt("Enter amount to deposit (IDRX):", "100000000");
+                              if (amount) {
+                                  try {
+                                      await deposit(BigInt(amount));
+                                      alert("Deposit successful!");
+                                  } catch (e) {
+                                      console.error(e);
+                                      alert("Deposit failed");
+                                  }
+                              }
+                          }}
+                          className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-cyan-500/50"
+                      >
                         Top Up Wallet
                       </Button>
                       <Button variant="outline" className="flex-1 h-11 rounded-xl border-white/20 text-white hover:bg-white/10">

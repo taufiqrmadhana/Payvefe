@@ -4,12 +4,14 @@ import { Flag } from '@/app/components/ui/flag';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 import { useState, useEffect } from 'react';
+import { usePayve } from '@/hooks/usePayve';
 
 interface PayveDashboardProps {
   onNavigate: (page: string) => void;
 }
 
 export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
+  const { deposit } = usePayve();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
