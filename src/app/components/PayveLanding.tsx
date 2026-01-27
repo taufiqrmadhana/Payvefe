@@ -1,6 +1,291 @@
-import { ArrowRight, Play, Zap, TrendingDown, FileWarning, Clock, Shield, Wallet, Users, ChevronRight, LogIn, Menu, X } from 'lucide-react';
+import { ArrowRight, Play, Zap, Clock, TrendingDown, Shield, ChevronRight, LogIn, Menu, X } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import createGlobe from "cobe";
+
+// Cobe Globe Component
+function Globe3D() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const labelCanvasRef = useRef<HTMLCanvasElement>(null);
+  const globeRef = useRef<any>(null);
+  const globeStateRef = useRef<any>(null);
+  const phiRef = useRef(0);
+  const thetaRef = useRef(0.3);
+  const isDragging = useRef(false);
+  const lastMouseX = useRef(0);
+  const lastMouseY = useRef(0);
+  const autoRotateSpeed = 0.003;
+
+  // Currency data with labels - focusing on 4 main currencies with accurate locations
+  const currencies = [
+    { lat: -4.2088, lon: 201.8456, label: 'IDR', color: '#10b981' },  // Jakarta, Indonesia
+    { lat: 1.3521, lon: 190.8198, label: 'SGD', color: '#06b6d4' },   // Singapore
+    { lat: 38.9072, lon: -10.0369, label: 'USD', color: '#3b82f6' },  // Washington DC, USA
+    { lat: 50.8503, lon: 134.3517, label: 'EUR', color: '#8b5cf6' }     // Brussels, Belgium (EU capital)
+  ];
+
+  // Function to project 3D coordinates to 2D canvas
+  const projectTo2D = (lat: number, lon: number, phi: number, theta: number, width: number, height: number) => {
+    const scale = Math.min(width, height) / 2 * 1.1;
+    const radius = scale;
+    
+    // Convert lat/lon to radians
+    const latRad = lat * (Math.PI / 180);
+    const lonRad = lon * (Math.PI / 180);
+    
+    // Calculate 3D position on sphere
+    // Using standard spherical coordinates
+    const x = radius * Math.cos(latRad) * Math.sin(lonRad);
+    const y = radius * Math.sin(latRad);
+    const z = radius * Math.cos(latRad) * Math.cos(lonRad);
+    
+    // Apply rotation transformations
+    // Rotate around Y axis (phi - horizontal rotation)
+    const cosPhi = Math.cos(phi);
+    const sinPhi = Math.sin(phi);
+    const x1 = x * cosPhi + z * sinPhi;
+    const z1 = -x * sinPhi + z * cosPhi;
+    
+    // Rotate around X axis (theta - vertical rotation)
+    const cosTheta = Math.cos(theta);
+    const sinTheta = Math.sin(theta);
+    const y2 = y * cosTheta - z1 * sinTheta;
+    const z2 = y * sinTheta + z1 * cosTheta;
+    
+    // Check if point is visible (on the front hemisphere)
+    const isVisible = z2 > 0;
+    
+    // Orthographic projection to 2D
+    const screenX = width / 2 + x1;
+    const screenY = height / 2 - y2;
+    
+    // Calculate depth for proper layering (closer points drawn last)
+    const depth = z2;
+    
+    return { x: screenX, y: screenY, z: depth, isVisible };
+  };
+
+  // Draw currency labels on overlay canvas
+  const drawLabels = () => {
+    const canvas = canvasRef.current;
+    const labelCanvas = labelCanvasRef.current;
+    if (!canvas || !labelCanvas) return;
+    
+    const ctx = labelCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    const width = labelCanvas.width;
+    const height = labelCanvas.height;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+    
+    // Calculate positions for all currencies
+    const labelData = currencies.map((currency) => {
+      const pos = projectTo2D(currency.lat, currency.lon, phiRef.current, thetaRef.current, width, height);
+      return { ...currency, ...pos };
+    });
+    
+    // Sort by depth (draw far labels first, near labels last)
+    labelData.sort((a, b) => a.z - b.z);
+    
+    // Draw each currency label
+    labelData.forEach((currency) => {
+      if (currency.isVisible) {
+        // Draw label with background
+        ctx.font = 'bold 16px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        const textWidth = ctx.measureText(currency.label).width;
+        const padding = 8;
+        const bgWidth = textWidth + padding * 2;
+        const bgHeight = 24;
+        
+        // Draw background with shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
+        
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.beginPath();
+        ctx.roundRect(currency.x - bgWidth / 2, currency.y - bgHeight / 2, bgWidth, bgHeight, 6);
+        ctx.fill();
+        
+        // Reset shadow for border
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Draw border
+        ctx.strokeStyle = currency.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw text
+        ctx.fillStyle = currency.color;
+        ctx.fillText(currency.label, currency.x, currency.y);
+      }
+    });
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const labelCanvas = labelCanvasRef.current;
+    if (!canvas || !labelCanvas) return;
+
+    const initGlobe = () => {
+      if (globeRef.current) {
+        globeRef.current.destroy();
+        globeRef.current = null;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const size = Math.min(rect.width, rect.height);
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const internalWidth = size * devicePixelRatio;
+      const internalHeight = size * devicePixelRatio;
+
+      canvas.width = internalWidth;
+      canvas.height = internalHeight;
+      
+      // Setup label canvas
+      if (labelCanvas) {
+        labelCanvas.width = internalWidth;
+        labelCanvas.height = internalHeight;
+      }
+
+      // Currency markers with real lat/lon coordinates
+      const markers = currencies.map(c => ({
+        location: [c.lat, c.lon],
+        size: 0.06
+      }));
+
+      globeRef.current = createGlobe(canvas, {
+        devicePixelRatio: devicePixelRatio,
+        width: internalWidth,
+        height: internalHeight,
+        phi: phiRef.current,
+        theta: thetaRef.current,
+        dark: 1,
+        scale: 1.1,
+        diffuse: 1.2,
+        mapSamples: 16000,
+        mapBrightness: 6,
+        baseColor: [0.1, 0.2, 0.4],
+        markerColor: [0.23, 0.82, 0.92],
+        glowColor: [0.2, 0.6, 1],
+        opacity: 1,
+        offset: [0, 0],
+        markers: markers,
+        onRender: (state) => {
+          globeStateRef.current = state;
+
+          if (!isDragging.current) {
+            phiRef.current += autoRotateSpeed;
+          }
+
+          state.phi = phiRef.current;
+          state.theta = thetaRef.current;
+
+          drawLabels(); // ⬅️ tetap di sini
+        },
+      });
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      isDragging.current = true;
+      lastMouseX.current = e.clientX;
+      lastMouseY.current = e.clientY;
+      canvas.style.cursor = "grabbing";
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (isDragging.current) {
+        const deltaX = e.clientX - lastMouseX.current;
+        const deltaY = e.clientY - lastMouseY.current;
+        const rotationSpeed = 0.005;
+
+        phiRef.current += deltaX * rotationSpeed;
+        // Invert deltaY to make it follow natural scrolling (up = up, down = down)
+        thetaRef.current = Math.max(
+          -Math.PI / 2,
+          Math.min(Math.PI / 2, thetaRef.current + deltaY * rotationSpeed)
+        );
+
+        lastMouseX.current = e.clientX;
+        lastMouseY.current = e.clientY;
+        
+        // Redraw labels immediately when dragging
+        drawLabels();
+      }
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      canvas.style.cursor = "grab";
+    };
+
+    const onMouseLeave = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        canvas.style.cursor = "grab";
+      }
+    };
+
+    initGlobe();
+
+    canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("mousemove", onMouseMove);
+    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("mouseleave", onMouseLeave);
+
+    const handleResize = () => {
+      initGlobe();
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (canvas) {
+        canvas.removeEventListener("mousedown", onMouseDown);
+        canvas.removeEventListener("mousemove", onMouseMove);
+        canvas.removeEventListener("mouseup", onMouseUp);
+        canvas.removeEventListener("mouseleave", onMouseLeave);
+      }
+      if (globeRef.current) {
+        globeRef.current.destroy();
+        globeRef.current = null;
+      }
+    };
+  }, []);
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* Globe Canvas */}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full max-w-[600px] max-h-[600px]"
+        style={{
+          aspectRatio: "1",
+          cursor: "grab",
+        }}
+      />
+      
+      {/* Label Overlay Canvas */}
+      <canvas
+        ref={labelCanvasRef}
+        className="absolute w-full h-full max-w-[600px] max-h-[600px] pointer-events-none"
+        style={{
+          aspectRatio: "1",
+        }}
+      />
+    </div>
+  );
+}
 
 interface PayveLandingProps {
   onNavigate: (page: string) => void;
@@ -8,28 +293,90 @@ interface PayveLandingProps {
 
 export function PayveLanding({ onNavigate }: PayveLandingProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Handle scroll for header background
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Intersection Observer for scroll animations
+  useEffect(() => {
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisibleSections((prev) => new Set(prev).add(entry.target.id));
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '0px 0px -100px 0px'
+      }
+    );
+
+    const sections = document.querySelectorAll('[data-scroll-section]');
+    sections.forEach((section) => {
+      if (observerRef.current) {
+        observerRef.current.observe(section);
+      }
+    });
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 overflow-x-hidden">
       {/* Fixed Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        scrolled 
+          ? 'bg-slate-900/95 backdrop-blur-xl border-b border-white/20 shadow-2xl shadow-black/20' 
+          : 'bg-slate-900/80 backdrop-blur-xl border-b border-white/10'
+      }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <div 
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
+            <div className="relative w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center transition-all duration-300">
+              {/* Clean Logo Image */}
+              <img 
+                src="/src/public/Payve-Logo.png" 
+                alt="Payve Logo" 
+                className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+              />
             </div>
-            <div>
-              <div className="text-lg sm:text-xl font-bold text-white">Payve</div>
-              <div className="text-[10px] sm:text-xs text-cyan-400 font-semibold">Powered by Base</div>
+
+            <div className="flex flex-col">
+              <span className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                Payve
+              </span>
             </div>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-8">
-            <a href="#features" className="text-slate-300 hover:text-white transition-colors font-medium">Features</a>
-            <a href="#how-it-works" className="text-slate-300 hover:text-white transition-colors font-medium">How It Works</a>
-            <a href="#pricing" className="text-slate-300 hover:text-white transition-colors font-medium">Pricing</a>
+            <a href="#features" className="text-slate-300 hover:text-cyan-400 transition-all duration-300 font-medium relative group">
+              Features
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cyan-400 group-hover:w-full transition-all duration-300"></span>
+            </a>
+            <a href="#technology" className="text-slate-300 hover:text-cyan-400 transition-all duration-300 font-medium relative group">
+              Technology
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cyan-400 group-hover:w-full transition-all duration-300"></span>
+            </a>
           </nav>
 
           {/* Desktop CTA Buttons */}
@@ -37,16 +384,16 @@ export function PayveLanding({ onNavigate }: PayveLandingProps) {
             <Button 
               onClick={() => onNavigate('authentication')}
               variant="ghost"
-              className="h-9 sm:h-10 px-4 sm:px-5 text-white hover:bg-white/10 border border-white/20 rounded-lg font-semibold text-sm sm:text-base"
+              className="h-9 sm:h-10 px-4 sm:px-5 text-white hover:bg-white/10 border border-white/20 rounded-lg font-semibold text-sm sm:text-base transition-all duration-300 hover:border-cyan-400/50"
             >
               <LogIn className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
               <span className="hidden sm:inline">Login</span>
             </Button>
             <Button 
               onClick={() => onNavigate('authentication')}
-              className="h-9 sm:h-10 px-4 sm:px-5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg font-semibold shadow-lg shadow-cyan-500/30 text-sm sm:text-base"
+              className="h-9 sm:h-10 px-4 sm:px-5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg font-semibold shadow-lg shadow-cyan-500/30 text-sm sm:text-base transition-all duration-300 hover:shadow-cyan-500/50 hover:scale-105"
             >
-              <span className="hidden sm:inline">Start Free Trial</span>
+              <span className="hidden sm:inline">Get Started</span>
               <span className="sm:hidden">Sign Up</span>
             </Button>
           </div>
@@ -54,172 +401,132 @@ export function PayveLanding({ onNavigate }: PayveLandingProps) {
           {/* Mobile Menu Button */}
           <button 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="sm:hidden w-10 h-10 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all"
+            className="sm:hidden w-10 h-10 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all duration-300 hover:border-cyan-400/50"
           >
             {mobileMenuOpen ? (
-              <X className="w-5 h-5 text-white" />
+              <X className="w-5 h-5 text-white transition-transform duration-300 rotate-90" />
             ) : (
-              <Menu className="w-5 h-5 text-white" />
+              <Menu className="w-5 h-5 text-white transition-transform duration-300" />
             )}
           </button>
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="sm:hidden bg-slate-900/95 backdrop-blur-xl border-t border-white/10">
-            <nav className="px-4 py-4 space-y-2">
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all font-medium">Features</a>
-              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all font-medium">How It Works</a>
-              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all font-medium">Pricing</a>
-              <div className="pt-2 flex flex-col gap-2">
-                <Button 
-                  onClick={() => { setMobileMenuOpen(false); onNavigate('authentication'); }}
-                  variant="ghost"
-                  className="w-full h-11 text-white hover:bg-white/10 border border-white/20 rounded-lg font-semibold justify-center"
-                >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Login
-                </Button>
-                <Button 
-                  onClick={() => { setMobileMenuOpen(false); onNavigate('authentication'); }}
-                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg font-semibold shadow-lg shadow-cyan-500/30 justify-center"
-                >
-                  Start Free Trial
-                </Button>
-              </div>
-            </nav>
-          </div>
-        )}
+        <div className={`sm:hidden bg-slate-900/95 backdrop-blur-xl border-t border-white/10 transition-all duration-300 overflow-hidden ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <nav className="px-4 py-4 space-y-2">
+            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all duration-300 font-medium">Features</a>
+            <a href="#technology" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/50 transition-all duration-300 font-medium">Technology</a>
+            <div className="pt-2 flex flex-col gap-2">
+              <Button 
+                onClick={() => { setMobileMenuOpen(false); onNavigate('authentication'); }}
+                variant="ghost"
+                className="w-full h-11 text-white hover:bg-white/10 border border-white/20 rounded-lg font-semibold justify-center transition-all duration-300"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Login
+              </Button>
+              <Button 
+                onClick={() => { setMobileMenuOpen(false); onNavigate('authentication'); }}
+                className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg font-semibold shadow-lg shadow-cyan-500/30 justify-center transition-all duration-300"
+              >
+                Get Started
+              </Button>
+            </div>
+          </nav>
+        </div>
       </header>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center overflow-hidden pt-16 sm:pt-20">
-        {/* Dark Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"></div>
+      <section className="relative min-h-screen flex items-center overflow-hidden pt-16 sm:pt-20 bg-slate-950">
+        {/* Deep Mesh Background */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute bottom-[10%] right-[-5%] w-[60%] h-[60%] bg-cyan-500/10 blur-[140px] rounded-full" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#020617_85%)]" />
+        </div>
         
-        {/* Animated Grid Overlay */}
+        {/* Refined Perspective Grid */}
         <div 
-          className="absolute inset-0 opacity-[0.03]" 
+          className="absolute inset-0 opacity-[0.15] z-0" 
           style={{
-            backgroundImage: 'linear-gradient(rgba(59,130,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.5) 1px, transparent 1px)',
-            backgroundSize: '64px 64px'
+            backgroundImage: 'linear-gradient(#1e293b 1px, transparent 1px), linear-gradient(90deg, #1e293b 1px, transparent 1px)',
+            backgroundSize: '80px 80px',
+            maskImage: 'radial-gradient(ellipse at center, black, transparent 80%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black, transparent 80%)'
           }}
-        ></div>
+        />
 
-        {/* Floating Shapes */}
-        <div className="absolute top-20 left-10 sm:left-20 w-48 h-48 sm:w-64 sm:h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 sm:right-20 w-64 h-64 sm:w-96 sm:h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        {/* Cinematic Grain */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.15] pointer-events-none z-0 mix-blend-overlay" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 py-12 sm:py-20 grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-16 items-center">
           {/* Left Content */}
-          <div>
-            <div className="mb-4 sm:mb-6">
-              <span className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-semibold text-cyan-400 tracking-widest uppercase bg-white/5 backdrop-blur-sm border border-white/10">
-                <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                Powered by Base L2 • IDRX Integrated
-              </span>
+          <div className="space-y-4 sm:space-y-6 animate-fadeIn">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-semibold text-cyan-400 tracking-widest uppercase bg-white/5 backdrop-blur-sm border border-white/10 hover:border-cyan-400/50 transition-all duration-300">
+              Powered by Base L2 • IDRX Integrated
             </div>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
               Cross-Border Payroll
               <br />
-              in <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Seconds</span>, Not Days
+              in <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent animate-gradient">Seconds</span>, Not Days
             </h1>
 
-            <p className="text-base sm:text-xl text-slate-300 mb-6 sm:mb-8 leading-relaxed max-w-xl">
-              Pay global teams with crypto rails. 90% lower fees. Instant settlement.
+            <p className="text-sm sm:text-base md:text-lg text-slate-300 leading-relaxed max-w-xl">
+              Pay global teams with crypto rails. <span className="text-cyan-400 font-semibold">90% lower fees</span>. <span className="text-cyan-400 font-semibold">Instant settlement</span>.
             </p>
 
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-8 sm:mb-12">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
               <Button 
                 onClick={() => onNavigate('authentication')}
-                className="h-11 sm:h-12 px-6 sm:px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-sm sm:text-base font-semibold rounded-xl shadow-2xl hover:shadow-cyan-500/50 hover:-translate-y-0.5 transition-all duration-200 w-full sm:w-auto justify-center"
+                className="h-10 sm:h-11 px-5 sm:px-7 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-sm sm:text-base font-semibold rounded-xl shadow-2xl hover:shadow-cyan-500/50 hover:-translate-y-1 transition-all duration-300 w-full sm:w-auto justify-center group"
               >
                 Start Free Trial
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
               </Button>
               <Button 
                 variant="ghost"
-                className="h-11 sm:h-12 px-6 sm:px-8 text-white border-2 border-white/20 hover:bg-white/10 backdrop-blur-sm text-sm sm:text-base font-semibold rounded-xl w-full sm:w-auto justify-center"
+                className="h-10 sm:h-11 px-5 sm:px-7 text-white border-2 border-white/20 hover:bg-white/10 hover:border-cyan-400/50 backdrop-blur-sm text-sm sm:text-base font-semibold rounded-xl w-full sm:w-auto justify-center transition-all duration-300 group"
               >
-                <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2 fill-white" />
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2 fill-white group-hover:scale-110 transition-transform duration-300" />
                 Watch Demo
               </Button>
             </div>
-
-            {/* Trust Badges */}
-            <div className="flex flex-wrap gap-2 sm:gap-4">
-              {['Built on Base L2', 'Audited by OpenZeppelin', 'SOC 2 Compliant'].map((badge, i) => (
-                <div key={i} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 text-slate-300 text-xs sm:text-sm">
-                  {badge}
-                </div>
-              ))}
-            </div>
           </div>
 
-          {/* Right - 3D Dashboard Mockup */}
-          <div className="relative mt-8 lg:mt-0">
-            <div className="relative transform rotate-0 lg:rotate-2 hover:rotate-0 transition-transform duration-500">
-              <div className="bg-slate-800/50 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/10 p-4 sm:p-6 shadow-2xl">
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-4 sm:mb-6">
-                    <div className="text-white font-semibold text-sm sm:text-base">Payroll Dashboard</div>
-                    <div className="px-2 sm:px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px] sm:text-xs font-semibold border border-emerald-500/30">
-                      75 Employees
-                    </div>
-                  </div>
-
-                  {/* Employee Cards */}
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-white text-xs sm:text-sm font-medium">Employee {i}</div>
-                        <div className="text-slate-400 text-[10px] sm:text-xs">$520/month</div>
-                      </div>
-                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                        <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Total Amount */}
-                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-lg border border-blue-500/30">
-                    <div className="text-slate-400 text-xs sm:text-sm mb-1">Total Amount</div>
-                    <div className="text-white text-xl sm:text-2xl font-bold">$29,160</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating Elements */}
-            <div className="hidden sm:block absolute -top-4 -right-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-600/90 backdrop-blur-sm text-white rounded-lg shadow-lg text-xs sm:text-sm font-semibold animate-bounce border border-emerald-500/30">
-              Transaction confirmed ✓
-            </div>
-            <div className="hidden sm:block absolute -bottom-4 -left-4 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600/90 backdrop-blur-sm text-white rounded-lg shadow-lg text-xs sm:text-sm font-semibold border border-blue-500/30">
-              $29,160 settled
-            </div>
+          {/* Right - 3D Interactive Globe */}
+          <div className="relative mt-8 lg:mt-0 h-[500px] sm:h-[600px]">
+            <Globe3D />
           </div>
         </div>
       </section>
 
-      {/* Social Proof */}
-      <section className="py-12 sm:py-16 bg-slate-900 border-t border-white/5">
+      {/* Stats Section */}
+      <section 
+        id="stats-section"
+        data-scroll-section
+        className="py-12 sm:py-16 bg-slate-900 border-t border-b border-white/5"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <div className="text-center mb-8 sm:mb-12">
-            <p className="text-cyan-400 text-xs sm:text-sm font-semibold tracking-widest uppercase">Trusted by forward-thinking companies</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8 mb-12 sm:mb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-8">
             {[
               { label: 'Processed monthly', value: '$2.4M+' },
               { label: 'Global employees', value: '1,200+' },
-              { label: 'Uptime SLA', value: '99.9%' }
+              { label: 'Average savings', value: '90%' }
             ].map((stat, i) => (
-              <div key={i} className="text-center p-6 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <div className="text-3xl sm:text-4xl font-bold text-white mb-2">{stat.value}</div>
+              <div 
+                key={i} 
+                className={`text-center p-6 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-cyan-400/30 hover:-translate-y-2 transition-all duration-500 cursor-default group ${
+                  visibleSections.has('stats-section') 
+                    ? 'opacity-100 translate-y-0' 
+                    : 'opacity-0 translate-y-10'
+                }`}
+                style={{ 
+                  transitionDelay: `${i * 150}ms`,
+                  transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+              >
+                <div className="text-3xl sm:text-4xl font-bold text-transparent bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text mb-2 group-hover:scale-110 transition-transform duration-300">{stat.value}</div>
                 <div className="text-slate-400 text-sm">{stat.label}</div>
               </div>
             ))}
@@ -227,172 +534,329 @@ export function PayveLanding({ onNavigate }: PayveLandingProps) {
         </div>
       </section>
 
-      {/* Problem Section */}
-      <section className="py-12 sm:py-20 bg-slate-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center text-white mb-8 sm:mb-16">Traditional Payroll is Broken</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
+      {/* Features Section */}
+      <section 
+        id="features" 
+        data-scroll-section
+        className="py-20 sm:py-32 bg-slate-950 relative overflow-hidden"
+      >
+        {/* Decorative Background Elements */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-600/5 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 relative z-10">
+          <div className={`text-center mb-16 sm:mb-24 transition-all duration-1000 ${
+            visibleSections.has('features') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
+              Why Choose <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent animate-gradient">Payve</span>
+            </h2>
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
+              Traditional payroll systems were built for the 20th century. We built Payve for the global, on-chain future.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {[
-              { icon: Clock, title: '2-3 Day Settlement', desc: 'Wire transfers stuck in banking hours', color: 'from-red-500 to-orange-500' },
-              { icon: TrendingDown, title: '5-8% in Fees', desc: 'Wise, PayPal, and banks take massive cuts', color: 'from-amber-500 to-yellow-500' },
-              { icon: FileWarning, title: 'Manual Tax Hell', desc: 'Spreadsheets, errors, compliance nightmares', color: 'from-rose-500 to-pink-500' }
-            ].map((problem, i) => (
-              <div key={i} className="group p-6 sm:p-8 bg-slate-800/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 hover:border-white/20 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br ${problem.color} flex items-center justify-center mb-4 sm:mb-6`}>
-                  <problem.icon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              { 
+                icon: Zap, 
+                title: 'Instant Settlement', 
+                desc: 'Say goodbye to 3-day bank "holding" periods. Funds settle in your employees wallets in seconds.',
+                color: 'cyan',
+                border: 'group-hover:border-cyan-500/50'
+              },
+              { 
+                icon: TrendingDown, 
+                title: '90% Lower Fees', 
+                desc: 'By skipping SWIFT and intermediary banks, we cut costs from 5-8% down to less than 0.5%.',
+                color: 'blue',
+                border: 'group-hover:border-blue-500/50'
+              },
+              { 
+                icon: Shield, 
+                title: 'Secure & Compliant', 
+                desc: 'Smart contracts audited by industry leaders. Enterprise-grade security for your peace of mind.',
+                color: 'indigo',
+                border: 'group-hover:border-indigo-500/50'
+              }
+            ].map((feature, i) => (
+              <div 
+                key={i} 
+                className={`group relative p-8 sm:p-10 bg-slate-900/40 backdrop-blur-md rounded-[2.5rem] border border-white/5 ${feature.border} transition-all duration-500 hover:-translate-y-2 cursor-default ${
+                  visibleSections.has('features') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                style={{ 
+                  transitionDelay: `${i * 200}ms`,
+                  transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                {/* Spotlight Effect */}
+                <div className={`absolute inset-0 bg-gradient-to-br from-${feature.color}-500/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem]`} />
+                
+                <div className="relative z-10">
+                  {/* Animated Icon Container */}
+                  <div className="mb-8 relative">
+                    <div className={`w-16 h-16 rounded-2xl bg-slate-800 border border-white/10 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 group-hover:border-${feature.color}-500/30 group-hover:shadow-[0_0_30px_-5px_rgba(34,211,238,0.3)]`}>
+                      <feature.icon className={`w-8 h-8 text-white group-hover:text-cyan-400 transition-colors`} />
+                    </div>
+                    {/* Pulsing ring behind icon on hover */}
+                    <div className={`absolute inset-0 w-16 h-16 rounded-2xl bg-cyan-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity animate-pulse`} />
+                  </div>
+
+                  <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-white transition-colors">
+                    {feature.title}
+                  </h3>
+                  
+                  <p className="text-slate-400 text-base leading-relaxed group-hover:text-slate-300 transition-colors">
+                    {feature.desc}
+                  </p>
+                  
+                  {/* Subtle bottom arrow that appears on hover */}
+                  <div className="mt-6 flex items-center text-cyan-400 text-sm font-bold opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                    Learn more <ChevronRight className="ml-1 w-4 h-4" />
+                  </div>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3">{problem.title}</h3>
-                <p className="text-slate-400 text-sm sm:text-base">{problem.desc}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Solution Section */}
-      <section className="py-12 sm:py-20 bg-slate-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center text-white mb-3 sm:mb-4">
-            Meet Payve: Crypto Rails, Banking UX
-          </h2>
-          <p className="text-base sm:text-xl text-center text-slate-400 mb-8 sm:mb-16">
-            Traditional finance experience powered by blockchain technology
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
-            <div className="md:col-span-2 p-6 sm:p-8 bg-slate-800/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 shadow-lg">
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Execute Global Payroll in One Click</h3>
-              <p className="text-slate-400 mb-4 sm:mb-6 text-sm sm:text-base">Pay 1000 employees across 50 countries. Smart contracts handle distribution, compliance, and notifications.</p>
-              
-              {/* Real Dashboard Preview */}
-              <div className="bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl p-4 sm:p-6 border border-white/10">
-                {/* Top Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <div className="p-3 sm:p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                    <div className="text-blue-400 text-[10px] sm:text-xs font-semibold mb-1">TOTAL EMPLOYEES</div>
-                    <div className="text-white text-xl sm:text-2xl font-bold">75</div>
-                  </div>
-                  <div className="p-3 sm:p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                    <div className="text-emerald-400 text-[10px] sm:text-xs font-semibold mb-1">MONTHLY PAYROLL</div>
-                    <div className="text-white text-xl sm:text-2xl font-bold">$32.4K</div>
-                  </div>
-                  <div className="p-3 sm:p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
-                    <div className="text-cyan-400 text-[10px] sm:text-xs font-semibold mb-1">NEXT PAYMENT</div>
-                    <div className="text-white text-xl sm:text-2xl font-bold">5 days</div>
-                  </div>
-                </div>
-
-                {/* Employee List Preview */}
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-slate-600/30 rounded-lg">
-                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br ${
-                        i === 1 ? 'from-blue-500 to-cyan-500' : 
-                        i === 2 ? 'from-purple-500 to-pink-500' : 
-                        'from-emerald-500 to-green-500'
-                      }`}></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-white text-xs sm:text-sm font-medium">Employee {i}</div>
-                        <div className="text-slate-400 text-[10px] sm:text-xs">Indonesia</div>
-                      </div>
-                      <div className="text-white font-semibold text-xs sm:text-sm">$520</div>
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                        <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Execute Button Preview */}
-                <button className="w-full mt-3 sm:mt-4 h-9 sm:h-10 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 text-sm sm:text-base">
-                  <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  Execute Payroll
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 sm:p-8 bg-slate-800/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 shadow-lg">
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">90% Lower Fees</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-sm sm:text-base">Wise / PayPal</span>
-                  <span className="font-bold text-red-400 text-base sm:text-lg">$2,400</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-sm sm:text-base">Payve</span>
-                  <span className="font-bold text-emerald-400 text-base sm:text-lg">$240</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 sm:p-8 bg-slate-800/50 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 shadow-lg">
-              <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Instant Settlement</h3>
-              <p className="text-slate-400 mb-3 sm:mb-4 text-sm sm:text-base">Blockchain-powered transactions settle in seconds, not days</p>
-              <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm sm:text-base">
-                <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Real-time execution</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
       {/* Technology Stack */}
-      <section className="py-12 sm:py-20 bg-slate-950 border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center text-white mb-8 sm:mb-16">
-            Built on Best-in-Class Web3 Infrastructure
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <section 
+        id="technology" 
+        data-scroll-section
+        className="py-16 sm:py-24 bg-slate-900 border-t border-b border-white/5 relative overflow-hidden"
+      >
+        {/* Atmospheric light source for the section */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 relative z-10">
+          <div className={`text-center mb-12 sm:mb-20 transition-all duration-1000 ${
+            visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
+              Next-Gen <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent">Infrastructure</span>
+            </h2>
+            <p className="text-slate-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
+              Built on the most secure protocols to ensure your global payroll is settled with absolute precision.
+            </p>
+          </div>
+
+          {/* Adjusted Bento Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 sm:gap-5">
             {[
-              { name: 'Base L2', desc: 'Lightning-fast transactions', subdesc: 'Gas fees <$0.01', color: 'from-blue-500 to-cyan-500' },
-              { name: 'OnchainKit', desc: 'Email login, no seed phrases', subdesc: 'Account Abstraction built-in', color: 'from-indigo-500 to-purple-500' },
-              { name: 'IDRX Stablecoin', desc: 'Regulated Indonesian Rupiah', subdesc: 'Instant fiat on/off ramp', color: 'from-cyan-500 to-emerald-500' },
-              { name: 'Smart Contracts', desc: 'Audited by OpenZeppelin', subdesc: 'Trustless automation', color: 'from-emerald-500 to-green-500' }
+              { 
+                name: 'Base L2', 
+                desc: 'Ethereum-level security with lightning speeds. Gas fees <$0.01, making micro-payouts viable for any team size.', 
+                gradient: 'from-blue-600 to-cyan-500',
+                span: 'md:col-span-3',
+                icon: '⚡'
+              },
+              { 
+                name: 'OnchainKit', 
+                desc: 'Seamless onboarding via Account Abstraction. No seed phrases, just secure email-based access.', 
+                gradient: 'from-indigo-600 to-purple-500',
+                span: 'md:col-span-3',
+                icon: '🔑'
+              },
+              { 
+                name: 'IDRX Stablecoin', 
+                desc: '1:1 Rupiah backed. Instant fiat settlement for your Indonesian workforce.', 
+                gradient: 'from-cyan-600 to-emerald-500',
+                span: 'md:col-span-2',
+                icon: '🪙'
+              },
+              { 
+                name: 'Smart Contracts', 
+                desc: 'Audited by OpenZeppelin. Open-source, trustless, and fully automated distribution logic.', 
+                gradient: 'from-emerald-600 to-green-500',
+                span: 'md:col-span-4',
+                icon: '🛡️'
+              }
             ].map((tech, i) => (
-              <div key={i} className="p-5 sm:p-6 bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-300">
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${tech.color} mb-3 sm:mb-4`}></div>
-                <h3 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-2">{tech.name}</h3>
-                <p className="text-slate-400 text-xs sm:text-sm mb-1">{tech.desc}</p>
-                <p className="text-slate-500 text-[10px] sm:text-xs">{tech.subdesc}</p>
+              <div 
+                key={i} 
+                className={`group relative p-8 rounded-[2rem] bg-slate-950/40 backdrop-blur-md border border-white/5 hover:border-cyan-500/30 transition-all duration-500 cursor-default ${tech.span} ${
+                  visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                style={{ 
+                  transitionDelay: `${i * 100 + 200}ms`,
+                  transition: 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                {/* Internal Glow Effect on Hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]" />
+                
+                <div className="relative z-10">
+                  {/* Icon Container */}
+                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tech.gradient} flex items-center justify-center text-xl mb-6 shadow-xl shadow-black/40 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}>
+                    <span className="filter drop-shadow-sm">{tech.icon}</span>
+                  </div>
+                  
+                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-cyan-400 transition-colors duration-300">
+                    {tech.name}
+                  </h3>
+                  
+                  <p className="text-slate-400 text-sm sm:text-base leading-relaxed group-hover:text-slate-300 transition-colors">
+                    {tech.desc}
+                  </p>
+                </div>
+
+                {/* Bottom-right accent glow */}
+                <div className={`absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-br ${tech.gradient} opacity-0 group-hover:opacity-10 blur-[40px] transition-opacity duration-500`} />
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-12 sm:py-20 bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 relative overflow-hidden border-t border-white/5">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-64 h-64 sm:w-96 sm:h-96 bg-cyan-400 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-blue-400 rounded-full blur-3xl"></div>
-        </div>
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6">Ready to Transform Your Payroll?</h2>
-          <p className="text-base sm:text-xl text-slate-300 mb-6 sm:mb-8">Join 500+ companies paying globally with Payve</p>
-          <Button 
-            onClick={() => onNavigate('authentication')}
-            className="h-12 sm:h-14 px-8 sm:px-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-base sm:text-lg font-semibold rounded-xl shadow-2xl hover:shadow-cyan-500/50 hover:-translate-y-1 transition-all duration-200 w-full sm:w-auto justify-center"
-          >
-            Start Free Trial
-            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 ml-2" />
-          </Button>
-          <p className="text-slate-400 text-xs sm:text-sm mt-4 sm:mt-6">No credit card required • 14-day free trial</p>
-        </div>
-      </section>
-
       {/* Footer */}
-      <footer className="py-8 sm:py-12 bg-slate-950 border-t border-white/5">
+      <footer className="py-8 sm:py-12 bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-white mb-2">Payve</div>
-            <p className="text-slate-400 text-xs sm:text-sm mb-6 sm:mb-8">Payve-ing the way for cross-border crypto payroll</p>
-            <p className="text-slate-500 text-[10px] sm:text-xs">Built with ❤️ on Base • © 2026 Payve</p>
+            <div className="flex items-center justify-center gap-2 mb-4 group cursor-pointer">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-all duration-300 group-hover:scale-110">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-xl sm:text-2xl font-bold text-white group-hover:text-cyan-400 transition-colors duration-300">Payve</div>
+            </div>
+            <p className="text-slate-400 text-xs sm:text-sm mb-6">
+              Payve-ing the way for cross-border crypto payroll
+            </p>
           </div>
         </div>
       </footer>
+
+      <style jsx>{`
+        html {
+          scroll-behavior: smooth;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(50px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes gradient {
+          0%, 100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes rotateLatitude {
+          from {
+            transform: translateX(0) scaleX(1);
+          }
+          50% {
+            transform: translateX(5%) scaleX(0.98);
+          }
+          to {
+            transform: translateX(0) scaleX(1);
+          }
+        }
+
+        @keyframes rotateLongitude {
+          from {
+            transform: translateY(0) scaleY(1);
+          }
+          50% {
+            transform: translateY(5%) scaleY(0.98);
+          }
+          to {
+            transform: translateY(0) scaleY(1);
+          }
+        }
+
+        @keyframes rotateMeridian {
+          from {
+            transform: translateX(-50%) rotate(0deg);
+          }
+          to {
+            transform: translateX(-50%) rotate(360deg);
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.8s ease-out;
+        }
+
+        .animate-slideInRight {
+          animation: slideInRight 0.8s ease-out;
+        }
+
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 3s ease infinite;
+        }
+
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+
+        /* Smooth scroll for anchor links */
+        [id] {
+          scroll-margin-top: 6rem;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgb(15 23 42);
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, rgb(59 130 246), rgb(34 211 238));
+          border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, rgb(37 99 235), rgb(6 182 212));
+        }
+      `}</style>
     </div>
   );
 }
