@@ -1,20 +1,64 @@
 import { Wallet, Calendar, FileText, Bell, ArrowUpRight, ArrowDownLeft, Zap, TrendingUp, DollarSign, ExternalLink, Copy, Download, CheckCircle, Clock, Shield, LogOut, User, Settings as SettingsIcon, X } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
+import { Input } from '@/app/components/ui/input';
+import { Label } from '@/app/components/ui/label';
 import { useState } from 'react';
+import { usePayve, usePayveData } from '@/hooks/usePayve';
+import { WithdrawModal } from '@/app/components/WithdrawModal';
+import { useAccount } from 'wagmi';
 
 interface EmployeeDashboardProps {
   onNavigate: (page: string) => void;
 }
 
 export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
+  const { claimInvite } = usePayve();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [activeModal, setActiveModal] = useState<'payslip' | 'contract' | 'schedule' | null>(null);
+  const [activeModal, setActiveModal] = useState<'payslip' | 'contract' | 'schedule' | 'claim' | 'settings' | null>(null);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  
+  // Employee Feature State
+  const [inviteSecret, setInviteSecret] = useState('');
+  // In a real app, this should be persisted or fetched from a registry
+  const [targetCompanyAddress, setTargetCompanyAddress] = useState(''); 
+  
+  // Fetch Employee Data
+  const { employee } = usePayveData(targetCompanyAddress);
+
+  // Formatting helpers
+  const formatIDRX = (val: bigint | undefined) => val ? (Number(val) / 1e18).toLocaleString() : '0';
+  const formatUSD = (val: bigint | undefined) => val ? (Number(val) / 1e18 / 16000).toFixed(2) : '0.00'; // Mock exchange rate
+
   const transactions = [
     { date: 'Jan 25', type: 'receive', title: 'Salary Payment', amount: '+ $430.00', time: '14:32 UTC', hash: '0xabc123def456', status: 'success', idrx: '6,880,000 IDRX' },
     { date: 'Jan 20', type: 'send', title: 'Bank Withdrawal', amount: '- $215.00', time: '09:15 UTC', hash: '0xdef789ghi012', status: 'success', idrx: '3,440,000 IDRX' },
     { date: 'Jan 15', type: 'receive', title: 'Bonus Payment', amount: '+ $100.00', time: '16:20 UTC', hash: '0xghi345jkl678', status: 'success', idrx: '1,600,000 IDRX' },
     { date: 'Jan 10', type: 'send', title: 'Bank Withdrawal', amount: '- $150.00', time: '10:45 UTC', hash: '0xjkl901mno234', status: 'success', idrx: '2,400,000 IDRX' }
   ];
+
+  const handleClaimInvite = async () => {
+    if (!inviteSecret || !targetCompanyAddress) {
+        alert("Please enter Secret AND Company Address");
+        return;
+    }
+    try {
+        await claimInvite(targetCompanyAddress, inviteSecret);
+        alert("Invite claimed successfully!");
+        setInviteSecret('');
+        setActiveModal(null);
+    } catch (e) {
+        console.error("Claim failed:", e);
+        alert("Failed to claim invite. Check console.");
+    }
+  };
+
+  const handleWithdrawOpen = () => {
+      if (!targetCompanyAddress) {
+          alert("Please link your Employer Contract Address in Settings first");
+          return;
+      }
+      setIsWithdrawOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -48,7 +92,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold shadow-lg border-2 border-white/10 hover:shadow-cyan-500/50 transition-all"
                 >
-                  AS
+                  EMP
                 </button>
                 
                 {/* Dropdown Menu */}
@@ -62,11 +106,11 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                       <div className="p-4 border-b border-white/10">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold">
-                            AS
+                            EMP
                           </div>
                           <div>
-                            <p className="text-white font-semibold">Alex Smith</p>
-                            <p className="text-xs text-slate-400">alex@company.com</p>
+                            <p className="text-white font-semibold">{employee ? employee.name : "Employee"}</p>
+                            <p className="text-xs text-slate-400">user@payve.com</p>
                           </div>
                         </div>
                       </div>
@@ -75,9 +119,12 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                           <User className="w-4 h-4 text-slate-400" />
                           <span className="text-slate-300">My Profile</span>
                         </button>
-                        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-700/50 transition-all text-left">
+                        <button 
+                          onClick={() => { setActiveModal('settings'); setShowProfileMenu(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-700/50 transition-all text-left"
+                        >
                           <SettingsIcon className="w-4 h-4 text-slate-400" />
-                          <span className="text-slate-300">Settings</span>
+                          <span className="text-slate-300">Job Settings</span>
                         </button>
                       </div>
                       <div className="p-2 border-t border-white/10">
@@ -108,13 +155,17 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-3">
               <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-white/90" />
-              <p className="text-xs sm:text-sm uppercase text-white/90 tracking-wide font-semibold">Available Balance</p>
+              <p className="text-xs sm:text-sm uppercase text-white/90 tracking-wide font-semibold">Ready to Withdraw</p>
             </div>
             
             <div className="mb-6 sm:mb-8">
-              <p className="text-4xl sm:text-6xl font-bold text-white mb-2">$430.00</p>
+              <p className="text-4xl sm:text-6xl font-bold text-white mb-2">
+                  ${formatUSD(employee?.balance)}
+              </p>
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-base sm:text-lg text-white/80 font-medium">6,880,000 IDRX</p>
+                <p className="text-base sm:text-lg text-white/80 font-medium">
+                    {formatIDRX(employee?.balance)} IDRX
+                </p>
                 <div className="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-lg text-xs text-white font-semibold">
                   ≈ 1 USD = 16,000 IDRX
                 </div>
@@ -123,7 +174,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
             
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
-                onClick={() => onNavigate('withdraw-modal')}
+                onClick={handleWithdrawOpen}
                 className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-6 sm:px-8 h-11 sm:h-12 rounded-xl font-bold shadow-lg shadow-cyan-500/25 hover:shadow-xl hover:shadow-cyan-500/30 transition-all w-full sm:w-auto"
               >
                 <ArrowDownLeft className="w-5 h-5 mr-2" />
@@ -131,12 +182,12 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
               </Button>
               
               <Button 
-                onClick={() => setActiveModal('payslip')}
+                onClick={() => setActiveModal('claim')}
                 variant="outline"
                 className="border-2 border-white/30 text-white hover:text-white hover:bg-white/10 px-4 sm:px-6 h-11 sm:h-12 rounded-xl font-semibold backdrop-blur-sm w-full sm:w-auto"
               >
-                <FileText className="w-5 h-5 mr-2" />
-                View Payslip
+                <CheckCircle className="w-5 h-5 mr-2" />
+                Claim Job Invite
               </Button>
             </div>
           </div>
@@ -155,7 +206,9 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
               </div>
             </div>
             <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide font-semibold">Current Salary</p>
-            <p className="text-4xl font-bold text-white mb-1">$430</p>
+            <p className="text-4xl font-bold text-white mb-1">
+                ${formatUSD(employee?.salary)}
+            </p>
             <p className="text-sm text-slate-500">Net after taxes</p>
           </div>
 
@@ -597,23 +650,109 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                   ))}
                 </div>
               </div>
-
-              <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 mb-6">
-                <p className="text-sm text-slate-300">
-                  <strong className="text-white">Auto-payment:</strong> Your salary is automatically deposited to your Payve wallet on the 25th of each month.
-                </p>
-              </div>
-
-              <Button 
-                onClick={() => setActiveModal(null)}
-                variant="outline" 
-                className="w-full h-11 sm:h-12 border-white/20 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl"
-              >
-                Close
-              </Button>
             </div>
           </div>
         </div>
+      )}
+
+      {activeModal === 'claim' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-slate-800 rounded-2xl border border-white/10 shadow-2xl p-6 sm:p-8">
+            <button 
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 w-10 h-10 bg-slate-700/50 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-cyan-500/20">
+                    <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Claim Job Invite</h2>
+                <p className="text-slate-400">Enter the secret code from your employer to link your account.</p>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                   <Label className="text-white mb-2 block">Company Contract Address</Label>
+                   <Input 
+                      placeholder="0x..." 
+                      value={targetCompanyAddress}
+                      onChange={(e) => setTargetCompanyAddress(e.target.value)}
+                      className="bg-slate-700/50 border-white/10 text-white mb-1"
+                   />
+                   <p className="text-xs text-slate-500">Ensure this matches your employer's contract.</p>
+                </div>
+
+                <div>
+                   <Label className="text-white mb-2 block">Invite Secret</Label>
+                   <Input 
+                      placeholder="Enter secret code..." 
+                      type="password"
+                      value={inviteSecret}
+                      onChange={(e) => setInviteSecret(e.target.value)}
+                      className="bg-slate-700/50 border-white/10 text-white"
+                   />
+                </div>
+
+                <Button 
+                    onClick={handleClaimInvite}
+                    className="w-full h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg mt-4"
+                >
+                    Claim Invite
+                </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'settings' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-slate-800 rounded-2xl border border-white/10 shadow-2xl p-6 sm:p-8">
+             <button 
+              onClick={() => setActiveModal(null)}
+              className="absolute top-4 right-4 w-10 h-10 bg-slate-700/50 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-slate-600 to-slate-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <SettingsIcon className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Job Settings</h2>
+                <p className="text-slate-400">Manage your employment connection.</p>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                   <Label className="text-white mb-2 block">Employer Contract Address</Label>
+                   <div className="text-xs text-slate-400 mb-2">
+                       This is the smart contract address of the company you work for. You need this to claim invites and withdraw funds.
+                   </div>
+                   <Input 
+                      placeholder="0x..." 
+                      value={targetCompanyAddress}
+                      onChange={(e) => setTargetCompanyAddress(e.target.value)}
+                      className="bg-slate-700/50 border-white/10 text-white font-mono"
+                   />
+                </div>
+
+                <Button 
+                    onClick={() => setActiveModal(null)}
+                    className="w-full h-12 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl mt-4"
+                >
+                    Save & Close
+                </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revisit existing modals or close them properly */}
+      {isWithdrawOpen && (
+          <WithdrawModal onClose={() => setIsWithdrawOpen(false)} companyAddress={targetCompanyAddress} />
       )}
     </div>
   );

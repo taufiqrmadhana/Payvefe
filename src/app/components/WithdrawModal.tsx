@@ -2,24 +2,33 @@ import { X, Lock, Wallet, Building2, ArrowDownLeft, Zap } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { Checkbox } from '@/app/components/ui/checkbox';
 import { useState } from 'react';
 import { usePayve, usePayveData } from '@/hooks/usePayve';
-import { useAccount } from 'wagmi';
 
 interface WithdrawModalProps {
   onClose: () => void;
+  companyAddress?: string;
 }
 
-export function WithdrawModal({ onClose }: WithdrawModalProps) {
+interface Employee {
+    salary: bigint;
+    balance: bigint;
+    wallet: string;
+    name: string;
+    isActive: boolean;
+    lastPayTimestamp: bigint;
+}
+
+export function WithdrawModal({ onClose, companyAddress }: WithdrawModalProps) {
   const { withdraw } = usePayve();
-  const { address } = useAccount();
-  const { employee } = usePayveData(address);
+  // const { address } = useAccount(); // Unused
+  const { employee } = usePayveData(companyAddress);
+  const employeeData = employee as unknown as Employee;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Formatted balance
   // employee.balance is bigint wei
-  const rawBalance = employee?.balance ? Number(employee.balance) / 1e18 : 0;
+  const rawBalance = employeeData?.balance ? Number(employeeData.balance) / 1e18 : 0;
   const balanceUSD = (rawBalance / 16000).toFixed(2); // Approx rate
   
   return (
@@ -107,9 +116,13 @@ export function WithdrawModal({ onClose }: WithdrawModalProps) {
             </Button>
             <Button 
               onClick={async () => {
+                if (!companyAddress) {
+                    alert("Company address missing");
+                    return;
+                }
                 try {
                    setIsSubmitting(true);
-                   await withdraw(); // No args, withdraws all
+                   await withdraw(companyAddress); // No args, withdraws all
                    alert("Withdrawal successful! Check your wallet.");
                    onClose();
                 } catch (e) {

@@ -1,6 +1,7 @@
 import { ArrowLeft, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { usePayve } from '@/hooks/usePayve';
 import { 
   ConnectWallet, 
   Wallet, 
@@ -17,21 +18,24 @@ interface AuthenticationProps {
 export function Authentication({ onNavigate }: AuthenticationProps) {
   const [accountType, setAccountType] = useState<'company' | 'employee'>('company');
   const { address, isConnected } = useAccount();
+  const { myCompanyAddress } = usePayve();
 
   useEffect(() => {
     if (isConnected && address) {
-      // In a real app, we'd check on-chain role here.
-      // For now, we auto-redirect based on the toggle selection after a short delay
+      // Logic: If user has a company contract, they are a Company Owner.
+      // Otherwise, assume they are an Employee (or new user).
       const timer = setTimeout(() => {
-        if (accountType === 'company') {
-          onNavigate('dashboard');
+        if (myCompanyAddress) {
+           console.log("Found company address, redirecting to Dashboard");
+           onNavigate('dashboard');
         } else {
-          onNavigate('employee-dashboard');
+           console.log("No company address found, redirecting to Employee Dashboard");
+           onNavigate('employee-dashboard');
         }
-      }, 1500);
+      }, 2000); // Wait a bit for myCompanyAddress to load
       return () => clearTimeout(timer);
     }
-  }, [isConnected, address, accountType, onNavigate]);
+  }, [isConnected, address, myCompanyAddress, onNavigate]);
 
   return (
     <div className="min-h-screen flex bg-slate-950">

@@ -1,4 +1,18 @@
 import { Menu, X, Bell, Search } from 'lucide-react';
+import { 
+  Wallet, 
+  ConnectWallet, 
+  WalletDropdown, 
+  WalletDropdownLink, 
+  WalletDropdownDisconnect 
+} from '@coinbase/onchainkit/wallet';
+import { 
+  Address, 
+  Avatar, 
+  Name, 
+  Identity, 
+  EthBalance 
+} from '@coinbase/onchainkit/identity';
 
 interface CompanyHeaderProps {
   title: string;
@@ -52,18 +66,26 @@ export function CompanyHeader({
           <div className="flex items-center gap-2 sm:gap-3">
             {children}
             
-            {/* Search */}
-            {showSearch && (
-              <div className="relative hidden md:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text"
-                  placeholder="Search employees..."
-                  className="w-60 lg:w-80 h-11 pl-10 pr-12 rounded-xl bg-slate-800/50 border border-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all text-white placeholder:text-slate-400"
-                />
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-700 rounded border border-white/10">⌘K</kbd>
-              </div>
-            )}
+            <div className="hidden md:block">
+             <Wallet>
+              <ConnectWallet>
+                <Avatar className="h-6 w-6" />
+                <Name />
+              </ConnectWallet>
+              <WalletDropdown>
+                <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                  <Avatar />
+                  <Name />
+                  <Address className='text-xs text-slate-400'/>
+                  <EthBalance />
+                </Identity>
+                <WalletDropdownLink icon="wallet" href="https://keys.coinbase.com">
+                  Wallet
+                </WalletDropdownLink>
+                <WalletDropdownDisconnect />
+              </WalletDropdown>
+            </Wallet>
+            </div>
 
             {/* Notifications */}
             {showNotifications && onNavigate && (
