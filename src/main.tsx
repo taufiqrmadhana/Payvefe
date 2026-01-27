@@ -1,6 +1,7 @@
   import { createRoot } from "react-dom/client";
   import App from "./app/App.tsx";
   import "./styles/index.css";
+  import '@coinbase/onchainkit/styles.css';
   import { WagmiProvider } from 'wagmi';
   import { config } from './wagmi';
   import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
