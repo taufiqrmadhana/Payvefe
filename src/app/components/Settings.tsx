@@ -1,11 +1,14 @@
+import { parseEther } from 'viem';
 import { Building2, User, CreditCard, Bell, Shield, Mail, Globe, Save, ChevronRight, Zap, Wallet, Copy, Check } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { useState, useEffect } from 'react';
 import { useAccount, useBalance } from 'wagmi';
-import { IDRX_ADDRESS } from '@/constants';
+import { IDRX_ADDRESS, PAYVE_ADDRESS } from '@/constants';
 import { usePayve } from '@/hooks/usePayve';
+import { useReadContract } from 'wagmi';
+import MockIDRXABI from '@/abis/MockIDRX.json';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 
@@ -14,11 +17,22 @@ interface SettingsProps {
 }
 
 export function Settings({ onNavigate }: SettingsProps) {
-  const { deposit } = usePayve();
+  const { deposit, mint } = usePayve();
   const { address } = useAccount();
   const { data: idrxBalance } = useBalance({
     address: address,
     token: IDRX_ADDRESS as `0x${string}`,
+  });
+  
+  // Total Contract Balance
+  const { data: contractBalance } = useReadContract({
+    abi: MockIDRXABI.abi,
+    address: IDRX_ADDRESS as `0x${string}`,
+    functionName: 'balanceOf',
+    args: [PAYVE_ADDRESS],
+    query: {
+         refetchInterval: 2000 // Polling for faster updates
+    }
   });
 
   const [activeTab, setActiveTab] = useState('company');
@@ -231,11 +245,17 @@ export function Settings({ onNavigate }: SettingsProps) {
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-1 gap-4">
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
-                        <div className="text-sm text-slate-400 mb-1">IDRX Balance</div>
+                        <div className="text-sm text-slate-400 mb-1">Wallet SDK Balance</div>
                         <div className="text-2xl font-bold text-white">
                             {idrxBalance ? Math.floor(parseFloat(idrxBalance.formatted)).toLocaleString() : '0'} IDRX
+                        </div>
+                      </div>
+                      <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
+                        <div className="text-sm text-slate-400 mb-1">Company Liquidity (Payve)</div>
+                        <div className="text-2xl font-bold text-emerald-400">
+                             {contractBalance ? (Number(contractBalance) / 1e18).toLocaleString() : '0'} IDRX
                         </div>
                       </div>
                     </div>
@@ -243,10 +263,10 @@ export function Settings({ onNavigate }: SettingsProps) {
                     <div className="flex gap-3 pt-4">
                       <Button 
                           onClick={async () => {
-                              const amount = window.prompt("Enter amount to deposit (IDRX):", "100000000");
+                              const amount = window.prompt("Enter amount to deposit (IDRX):", "100");
                               if (amount) {
                                   try {
-                                      await deposit(BigInt(amount));
+                                      await deposit(parseEther(amount));
                                       alert("Deposit successful!");
                                   } catch (e) {
                                       console.error(e);
@@ -256,10 +276,40 @@ export function Settings({ onNavigate }: SettingsProps) {
                           }}
                           className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-cyan-500/50"
                       >
-                        Top Up Wallet
+                        Deposit to Payve
                       </Button>
                       <Button variant="outline" className="flex-1 h-11 rounded-xl border-white/20 text-white hover:bg-white/10">
                         Withdraw
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={async () => {
+                            const amount = window.prompt("Amount to mint (IDRX):", "1000");
+                            if (amount) {
+                                try {
+                                    await mint(parseEther(amount));
+                                    alert("Minted!");
+                                } catch (e) {
+                                    console.error(e);
+                                    alert("Mint failed (Are you the owner?)");
+                                }
+                            }
+                        }}
+                        className="flex-1 h-11 rounded-xl border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                      >
+                        Get Test IDRX
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={async () => {
+                            try {
+                                await deposit(BigInt(0)); // Hack to trigger mint if we exposed it, but we need to destructure mint from usePayve first.
+                                // Actually, let's just make it a real button calling the new mint function.
+                            } catch(e) {}
+                        }} 
+                        className="flex-1 h-11 rounded-xl border-purple-500/20 text-purple-300 hover:bg-purple-500/10 hidden"
+                      >
+                        Mint (Hidden)
                       </Button>
                     </div>
                   </div>

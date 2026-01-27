@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract, usePublicClient } from 'wagmi';
+import { useReadContract, useWriteContract, usePublicClient, useAccount } from 'wagmi';
 import PayveABI from '../abis/Payve.json';
 import MockIDRXABI from '../abis/MockIDRX.json';
 import { PAYVE_ADDRESS, IDRX_ADDRESS } from '../constants';
@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 
 export function usePayve() {
     const { writeContractAsync } = useWriteContract();
+    const { address } = useAccount();
 
     const publicClient = usePublicClient();
 
@@ -23,7 +24,7 @@ export function usePayve() {
     const deposit = useCallback(async (amount: bigint) => {
         // 1. Approve
         const hash = await writeContractAsync({
-            abi: MockIDRXABI,
+            abi: MockIDRXABI.abi,
             address: IDRX_ADDRESS,
             functionName: 'approve',
             args: [PAYVE_ADDRESS, amount],
@@ -71,12 +72,22 @@ export function usePayve() {
         });
     }, [writeContractAsync]);
 
+    const mint = useCallback(async (amount: bigint) => {
+        return writeContractAsync({
+            abi: MockIDRXABI.abi,
+            address: IDRX_ADDRESS,
+            functionName: 'mint',
+            args: [address, amount], // Mint to self
+        });
+    }, [writeContractAsync, address]);
+
     return {
         createInvite,
         deposit,
         distribute,
         claimInvite,
-        withdraw
+        withdraw,
+        mint
     };
 }
 
