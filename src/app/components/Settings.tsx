@@ -1,29 +1,34 @@
 import { parseEther } from 'viem';
-import { Building2, User, CreditCard, Bell, Shield, Mail, Globe, Save, ChevronRight, Zap, Wallet, Copy, Check } from 'lucide-react';
+import { Building2, User, CreditCard, Bell, Globe, Zap, Wallet, Copy, Check, Users } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { useState, useEffect } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { IDRX_ADDRESS, PAYVE_ADDRESS } from '@/constants';
-import { usePayve } from '@/hooks/usePayve';
+import { usePayve, usePayveData } from '@/hooks/usePayve';
 import { useReadContract } from 'wagmi';
 import MockIDRXABI from '@/abis/MockIDRX.json';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
+import { PayveAddEmployee } from '@/app/components/PayveAddEmployee';
+import { WithdrawModal } from '@/app/components/WithdrawModal';
 
 interface SettingsProps {
   onNavigate: (page: string) => void;
 }
 
 export function Settings({ onNavigate }: SettingsProps) {
-  const { deposit, mint } = usePayve();
+  const { deposit, mint, claimInvite } = usePayve();
   const { address } = useAccount();
   const { data: idrxBalance } = useBalance({
     address: address,
     token: IDRX_ADDRESS as `0x${string}`,
   });
   
+  // Check if current user is an employee
+  const { employee } = usePayveData(address);
+
   // Total Contract Balance
   const { data: contractBalance } = useReadContract({
     abi: MockIDRXABI.abi,
@@ -40,6 +45,13 @@ export function Settings({ onNavigate }: SettingsProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Modal States
+  const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+
+  // Employee Tab States
+  const [inviteSecret, setInviteSecret] = useState('');
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -53,6 +65,18 @@ export function Settings({ onNavigate }: SettingsProps) {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleClaimInvite = async () => {
+    if (!inviteSecret) return;
+    try {
+        await claimInvite(inviteSecret);
+        alert("Invite claimed successfully!");
+        setInviteSecret('');
+    } catch (e) {
+        console.error("Claim failed:", e);
+        alert("Failed to claim invite. Check console.");
+    }
   };
 
   return (
@@ -71,12 +95,13 @@ export function Settings({ onNavigate }: SettingsProps) {
         />
 
         {/* Content Area */}
-        <div className="p-4 sm:p-8">{/* Wrapped content in div */}
+        <div className="p-4 sm:p-8">
           <div className="max-w-5xl mx-auto">
             {/* Tabs */}
             <div className="flex gap-2 mb-8 overflow-x-auto bg-slate-800/50 p-1 rounded-xl border border-white/10">
               {[
                 { id: 'company' as const, label: 'Company', icon: Building2 },
+                { id: 'employee' as const, label: 'Employee', icon: Users },
                 { id: 'admin' as const, label: 'Admin', icon: User },
                 { id: 'wallet' as const, label: 'Wallet', icon: Wallet },
                 { id: 'billing' as const, label: 'Billing', icon: CreditCard },
@@ -104,14 +129,22 @@ export function Settings({ onNavigate }: SettingsProps) {
                 <>
                   {/* Company Information */}
                   <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="font-bold text-white">Company Information</h2>
-                        <p className="text-sm text-slate-400">Update your company details</p>
-                      </div>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                                <Building2 className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-white">Company Information</h2>
+                                <p className="text-sm text-slate-400">Update your company details</p>
+                            </div>
+                        </div>
+                        <Button 
+                            onClick={() => setIsAddEmployeeOpen(true)}
+                            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white"
+                        >
+                            Add Employee
+                        </Button>
                     </div>
 
                     <div className="space-y-4">
@@ -164,6 +197,54 @@ export function Settings({ onNavigate }: SettingsProps) {
                     </div>
                   </div>
                 </>
+              )}
+
+              {activeTab === 'employee' && (
+                <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
+                            <Users className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-white">Employee Actions</h2>
+                            <p className="text-sm text-slate-400">Manage your employment status</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* Claim Invite Section */}
+                        <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">Claim Invite</h3>
+                            <p className="text-sm text-slate-400 mb-4">Enter the secret code provided by your employer to link your wallet.</p>
+                            <div className="flex gap-2">
+                                <Input 
+                                    placeholder="Enter invite secret..." 
+                                    value={inviteSecret}
+                                    onChange={(e) => setInviteSecret(e.target.value)}
+                                    className="bg-slate-800 border-white/10 text-white"
+                                />
+                                <Button 
+                                    onClick={handleClaimInvite}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white"
+                                >
+                                    Claim
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Withdraw Section */}
+                        <div className="p-4 bg-slate-700/30 rounded-xl border border-white/10">
+                            <h3 className="font-semibold text-white mb-2">Withdraw Salary</h3>
+                            <p className="text-sm text-slate-400 mb-4">Access your available funds.</p>
+                            <Button 
+                                onClick={() => setIsWithdrawOpen(true)}
+                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold h-11 rounded-xl"
+                            >
+                                Withdraw Funds
+                            </Button>
+                        </div>
+                    </div>
+                </div>
               )}
 
               {activeTab === 'admin' && (
@@ -299,18 +380,6 @@ export function Settings({ onNavigate }: SettingsProps) {
                       >
                         Get Test IDRX
                       </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={async () => {
-                            try {
-                                await deposit(BigInt(0)); // Hack to trigger mint if we exposed it, but we need to destructure mint from usePayve first.
-                                // Actually, let's just make it a real button calling the new mint function.
-                            } catch(e) {}
-                        }} 
-                        className="flex-1 h-11 rounded-xl border-purple-500/20 text-purple-300 hover:bg-purple-500/10 hidden"
-                      >
-                        Mint (Hidden)
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -440,6 +509,15 @@ export function Settings({ onNavigate }: SettingsProps) {
             </div>
           </div>
         </div>
+
+        {/* Modals */}
+        {isAddEmployeeOpen && (
+            <PayveAddEmployee onClose={() => setIsAddEmployeeOpen(false)} onNavigate={onNavigate} />
+        )}
+        {isWithdrawOpen && (
+            <WithdrawModal onClose={() => setIsWithdrawOpen(false)} />
+        )}
+
       </main>
     </div>
   );
