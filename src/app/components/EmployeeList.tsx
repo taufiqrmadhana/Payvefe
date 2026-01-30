@@ -15,6 +15,7 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Checkbox } from '@/app/components/ui/checkbox';
 import { useState } from 'react';
+import { useDisconnect } from 'wagmi';
 
 interface EmployeeListProps {
   onNavigate: (page: string) => void;
@@ -33,6 +34,12 @@ const employees = [
 export function EmployeeList({ onNavigate }: EmployeeListProps) {
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'expiring'>('all');
+  const { disconnect } = useDisconnect();
+
+  const handleLogout = () => {
+    disconnect();
+    onNavigate('landing');
+  };
 
   const toggleEmployee = (index: number) => {
     if (selectedEmployees.includes(index)) {
@@ -110,7 +117,7 @@ export function EmployeeList({ onNavigate }: EmployeeListProps) {
               <div className="text-xs text-gray-500">Manager</div>
             </div>
           </div>
-          <button className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-2">
+          <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-2">
             <LogOut className="w-3 h-3" />
             Sign Out
           </button>

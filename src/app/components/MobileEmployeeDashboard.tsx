@@ -19,8 +19,12 @@ export function MobileEmployeeDashboard({ onNavigate }: MobileEmployeeDashboardP
       {/* Header */}
       <header className="bg-slate-900/50 backdrop-blur-xl px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <Zap className="w-5 h-5 text-white" />
+          <div className="relative w-9 h-9 flex items-center justify-center">
+            <img 
+              src="/src/public/Payve-Logo.png" 
+              alt="Payve Logo" 
+              className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+            />
           </div>
           <div>
             <div className="text-white font-bold">Payve</div>

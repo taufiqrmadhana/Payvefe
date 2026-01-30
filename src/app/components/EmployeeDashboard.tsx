@@ -5,7 +5,7 @@ import { Label } from '@/app/components/ui/label';
 import { useState } from 'react';
 import { usePayve, usePayveData } from '@/hooks/usePayve';
 import { WithdrawModal } from '@/app/components/WithdrawModal';
-import { useAccount } from 'wagmi';
+import { useAccount, useDisconnect } from 'wagmi';
 
 interface EmployeeDashboardProps {
   onNavigate: (page: string) => void;
@@ -13,6 +13,7 @@ interface EmployeeDashboardProps {
 
 export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   const { claimInvite } = usePayve();
+  const { disconnect } = useDisconnect();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeModal, setActiveModal] = useState<'payslip' | 'contract' | 'schedule' | 'claim' | 'settings' | null>(null);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -24,6 +25,12 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   
   // Fetch Employee Data
   const { employee } = usePayveData(targetCompanyAddress);
+
+  // Logout handler
+  const handleLogout = () => {
+    disconnect();
+    onNavigate('landing');
+  };
 
   // Formatting helpers
   const formatIDRX = (val: bigint | undefined) => val ? (Number(val) / 1e18).toLocaleString() : '0';
@@ -69,11 +76,15 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
             <div className="flex items-center gap-3 sm:gap-4">
               {/* Logo */}
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <div className="relative w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center">
+                  <img 
+                    src="/src/public/Payve-Logo.png" 
+                    alt="Payve Logo" 
+                    className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+                  />
                 </div>
                 <div className="hidden sm:block">
-                  <div className="text-xl font-bold text-white">Payve</div>
+                  <div className="text-lg sm:text-xl font-bold text-white tracking-tight">Payve</div>
                   <div className="text-xs text-cyan-400 font-medium">Employee Portal</div>
                 </div>
               </div>
@@ -81,16 +92,16 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
             
             <div className="flex items-center gap-3">
               {/* Notifications */}
-              <button className="relative w-11 h-11 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all">
-                <Bell className="w-5 h-5 text-slate-300" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">2</span>
+              <button className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-[10px] sm:text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">2</span>
               </button>
               
               {/* Avatar with Dropdown */}
               <div className="relative">
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold shadow-lg border-2 border-white/10 hover:shadow-cyan-500/50 transition-all"
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-lg border-2 border-white/10 hover:shadow-cyan-500/50 transition-all"
                 >
                   EMP
                 </button>
@@ -129,7 +140,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                       </div>
                       <div className="p-2 border-t border-white/10">
                         <button 
-                          onClick={() => onNavigate('landing')}
+                          onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/20 transition-all text-left group"
                         >
                           <LogOut className="w-4 h-4 text-red-400" />
@@ -183,8 +194,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
               
               <Button 
                 onClick={() => setActiveModal('claim')}
-                variant="outline"
-                className="border-2 border-white/30 text-white hover:text-white hover:bg-white/10 px-4 sm:px-6 h-11 sm:h-12 rounded-xl font-semibold backdrop-blur-sm w-full sm:w-auto"
+                className="bg-slate-800/80 hover:bg-slate-700/80 border border-white/20 text-white px-4 sm:px-6 h-11 sm:h-12 rounded-xl font-semibold backdrop-blur-sm w-full sm:w-auto"
               >
                 <CheckCircle className="w-5 h-5 mr-2" />
                 Claim Job Invite

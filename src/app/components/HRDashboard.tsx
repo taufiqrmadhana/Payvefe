@@ -10,12 +10,20 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
+import { useDisconnect } from 'wagmi';
 
 interface HRDashboardProps {
   onNavigate: (page: string) => void;
 }
 
 export function HRDashboard({ onNavigate }: HRDashboardProps) {
+  const { disconnect } = useDisconnect();
+
+  const handleLogout = () => {
+    disconnect();
+    onNavigate('landing');
+  };
+
   return (
     <div className="flex h-screen bg-[#F9FAFB]">
       {/* Sidebar */}
@@ -76,7 +84,7 @@ export function HRDashboard({ onNavigate }: HRDashboardProps) {
               <div className="text-xs text-gray-500">Manager</div>
             </div>
           </div>
-          <button className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-2">
+          <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-2">
             <LogOut className="w-3 h-3" />
             Sign Out
           </button>

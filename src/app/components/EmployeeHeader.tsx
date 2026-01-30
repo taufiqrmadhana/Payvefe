@@ -19,9 +19,9 @@ export function EmployeeHeader({
 }: EmployeeHeaderProps) {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
-      <div className="px-4 sm:px-8 py-4 sm:py-6">
+      <div className="px-4 sm:px-8 py-4 sm:py-5">
         <div className="flex items-center justify-between">
-          {/* Left: Hamburger + Title */}
+          {/* Left: Hamburger + Logo + Title */}
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Mobile Hamburger Button */}
             {isMobile && (
@@ -36,9 +36,20 @@ export function EmployeeHeader({
                 )}
               </button>
             )}
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">{title}</h1>
-              {subtitle && <p className="text-xs sm:text-sm text-slate-400 mt-1 hidden sm:block">{subtitle}</p>}
+            
+            {/* Logo */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
+                <img 
+                  src="/src/public/Payve-Logo.png" 
+                  alt="Payve Logo" 
+                  className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+                />
+              </div>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold text-white">{title}</h1>
+                {subtitle && <p className="text-xs text-slate-400 hidden sm:block">{subtitle}</p>}
+              </div>
             </div>
           </div>
 

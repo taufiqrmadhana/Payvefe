@@ -13,6 +13,7 @@ import {
   History
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useDisconnect } from 'wagmi';
 
 interface EmployeeSidebarProps {
   currentPage: string;
@@ -24,9 +25,16 @@ interface EmployeeSidebarProps {
 export function EmployeeSidebar({ currentPage, onNavigate, isMobileMenuOpen: externalMobileMenuOpen, setIsMobileMenuOpen: externalSetMobileMenuOpen }: EmployeeSidebarProps) {
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const { disconnect } = useDisconnect();
   
   const isMobileMenuOpen = externalMobileMenuOpen !== undefined ? externalMobileMenuOpen : internalMobileMenuOpen;
   const setIsMobileMenuOpen = externalSetMobileMenuOpen || setInternalMobileMenuOpen;
+
+  // Logout handler
+  const handleLogout = () => {
+    disconnect();
+    onNavigate('landing');
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -81,8 +89,12 @@ export function EmployeeSidebar({ currentPage, onNavigate, isMobileMenuOpen: ext
         {/* Header */}
         <div className="p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30 relative">
-              <Zap className="w-6 h-6 text-white" />
+            <div className="relative w-10 h-10 flex items-center justify-center">
+              <img 
+                src="/src/public/Payve-Logo.png" 
+                alt="Payve Logo" 
+                className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+              />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
             </div>
             <div>
@@ -203,7 +215,7 @@ export function EmployeeSidebar({ currentPage, onNavigate, isMobileMenuOpen: ext
             </div>
             
             <button
-              onClick={() => handleMenuItemClick('landing')}
+              onClick={handleLogout}
               className="w-full h-9 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm font-semibold transition-all flex items-center justify-center gap-2 group"
             >
               <LogOut className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
