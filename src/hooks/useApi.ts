@@ -43,16 +43,74 @@ import {
     type CompanyCheckResponse,
 } from '../services/companyService';
 
+// Simple in-memory cache with timestamp
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+}
+
+const cache: Record<string, CacheEntry<unknown>> = {};
+const CACHE_DURATION = 30000; // 30 seconds
+
+function getCached<T>(key: string): T | null {
+    const entry = cache[key] as CacheEntry<T> | undefined;
+    if (entry && Date.now() - entry.timestamp < CACHE_DURATION) {
+        return entry.data;
+    }
+    return null;
+}
+
+function setCache<T>(key: string, data: T): void {
+    cache[key] = { data, timestamp: Date.now() };
+}
+
+function clearCache(keyPrefix?: string): void {
+    if (keyPrefix) {
+        Object.keys(cache).forEach(key => {
+            if (key.startsWith(keyPrefix)) delete cache[key];
+        });
+    } else {
+        Object.keys(cache).forEach(key => delete cache[key]);
+    }
+}
+
 // ==================== Notifications Hook ====================
 
+interface NotificationCache {
+    notifications: Notification[];
+    unreadCount: number;
+}
+
 export function useNotifications(walletAddress: string | undefined) {
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifications, setNotifications] = useState<Notification[]>(() => {
+        if (walletAddress) {
+            const cached = getCached<NotificationCache>(`notifications_${walletAddress}`);
+            return cached?.notifications || [];
+        }
+        return [];
+    });
+    const [unreadCount, setUnreadCount] = useState(() => {
+        if (walletAddress) {
+            const cached = getCached<NotificationCache>(`notifications_${walletAddress}`);
+            return cached?.unreadCount || 0;
+        }
+        return 0;
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
-    const fetchNotifications = useCallback(async (includeRead = true) => {
+    const fetchNotifications = useCallback(async (includeRead = true, force = false) => {
         if (!walletAddress) return;
+
+        const cacheKey = `notifications_${walletAddress}`;
+        if (!force) {
+            const cached = getCached<NotificationCache>(cacheKey);
+            if (cached) {
+                setNotifications(cached.notifications);
+                setUnreadCount(cached.unreadCount);
+                return;
+            }
+        }
 
         setLoading(true);
         setError(null);
@@ -61,6 +119,10 @@ export function useNotifications(walletAddress: string | undefined) {
             const response = await notificationService.list(walletAddress, includeRead);
             setNotifications(response.data.notifications);
             setUnreadCount(response.data.unread_count);
+            setCache(cacheKey, { 
+                notifications: response.data.notifications, 
+                unreadCount: response.data.unread_count 
+            });
         } catch (err) {
             setError(err instanceof Error ? err : new Error('Failed to fetch notifications'));
         } finally {
@@ -75,10 +137,12 @@ export function useNotifications(walletAddress: string | undefined) {
                 prev.map(n => n.id === notifId ? { ...n, is_read: true } : n)
             );
             setUnreadCount(prev => Math.max(0, prev - 1));
+            // Clear cache so next fetch gets fresh data
+            if (walletAddress) clearCache(`notifications_${walletAddress}`);
         } catch (err) {
             console.error('Failed to mark notification as read:', err);
         }
-    }, []);
+    }, [walletAddress]);
 
     const markAllAsRead = useCallback(async () => {
         if (!walletAddress) return;
@@ -87,6 +151,7 @@ export function useNotifications(walletAddress: string | undefined) {
             await notificationService.markAllAsRead(walletAddress);
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
             setUnreadCount(0);
+            clearCache(`notifications_${walletAddress}`);
         } catch (err) {
             console.error('Failed to mark all as read:', err);
         }
@@ -156,13 +221,34 @@ export function useTransactions(walletAddress: string | undefined, isCompany = f
 // ==================== Dashboard Hook ====================
 
 export function useDashboard(adminWalletAddress: string | undefined) {
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+    const [stats, setStats] = useState<DashboardStats | null>(() => {
+        // Initialize from cache if available
+        if (adminWalletAddress) {
+            return getCached<DashboardStats>(`dashboard_stats_${adminWalletAddress}`);
+        }
+        return null;
+    });
+    const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(() => {
+        if (adminWalletAddress) {
+            return getCached<DashboardAnalytics>(`dashboard_analytics_${adminWalletAddress}`);
+        }
+        return null;
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
-    const fetchStats = useCallback(async () => {
+    const fetchStats = useCallback(async (force = false) => {
         if (!adminWalletAddress) return;
+
+        // Check cache first unless forced
+        const cacheKey = `dashboard_stats_${adminWalletAddress}`;
+        if (!force) {
+            const cached = getCached<DashboardStats>(cacheKey);
+            if (cached) {
+                setStats(cached);
+                return;
+            }
+        }
 
         setLoading(true);
         setError(null);
@@ -170,6 +256,7 @@ export function useDashboard(adminWalletAddress: string | undefined) {
         try {
             const response = await dashboardService.getStats(adminWalletAddress);
             setStats(response.data);
+            setCache(cacheKey, response.data);
         } catch (err) {
             setError(err instanceof Error ? err : new Error('Failed to fetch dashboard stats'));
         } finally {
@@ -177,12 +264,22 @@ export function useDashboard(adminWalletAddress: string | undefined) {
         }
     }, [adminWalletAddress]);
 
-    const fetchAnalytics = useCallback(async (months = 6) => {
+    const fetchAnalytics = useCallback(async (months = 6, force = false) => {
         if (!adminWalletAddress) return;
+
+        const cacheKey = `dashboard_analytics_${adminWalletAddress}`;
+        if (!force) {
+            const cached = getCached<DashboardAnalytics>(cacheKey);
+            if (cached) {
+                setAnalytics(cached);
+                return;
+            }
+        }
 
         try {
             const response = await dashboardService.getAnalytics(adminWalletAddress, months);
             setAnalytics(response.data);
+            setCache(cacheKey, response.data);
         } catch (err) {
             console.error('Failed to fetch analytics:', err);
         }
@@ -540,13 +637,35 @@ export function useEmployeePayslip(
  * Hook for managing company data and syncing with backend
  */
 export function useCompany(walletAddress: string | undefined) {
-    const [company, setCompany] = useState<Company | null>(null);
+    const [company, setCompany] = useState<Company | null>(() => {
+        if (walletAddress) {
+            const cached = getCached<{ company: Company | null; exists: boolean }>(`company_${walletAddress}`);
+            return cached?.company || null;
+        }
+        return null;
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
-    const [exists, setExists] = useState(false);
+    const [exists, setExists] = useState(() => {
+        if (walletAddress) {
+            const cached = getCached<{ company: Company | null; exists: boolean }>(`company_${walletAddress}`);
+            return cached?.exists || false;
+        }
+        return false;
+    });
 
-    const checkCompany = useCallback(async () => {
+    const checkCompany = useCallback(async (force = false) => {
         if (!walletAddress) return;
+
+        const cacheKey = `company_${walletAddress}`;
+        if (!force) {
+            const cached = getCached<{ company: Company | null; exists: boolean }>(cacheKey);
+            if (cached) {
+                setExists(cached.exists);
+                setCompany(cached.company);
+                return;
+            }
+        }
 
         setLoading(true);
         setError(null);
@@ -555,6 +674,7 @@ export function useCompany(walletAddress: string | undefined) {
             const result = await companyService.checkCompany(walletAddress);
             setExists(result.exists);
             setCompany(result.company || null);
+            setCache(cacheKey, { company: result.company || null, exists: result.exists });
         } catch (err) {
             setError(err instanceof Error ? err : new Error('Failed to check company'));
         } finally {
@@ -574,7 +694,8 @@ export function useCompany(walletAddress: string | undefined) {
                 wallet_address: walletAddress,
                 payroll_day: payrollDay,
             });
-            await checkCompany();
+            clearCache(`company_${walletAddress}`);
+            await checkCompany(true);
             return response.data;
         } catch (err) {
             setError(err instanceof Error ? err : new Error('Failed to create company'));
@@ -593,7 +714,7 @@ export function useCompany(walletAddress: string | undefined) {
         exists,
         loading,
         error,
-        refresh: checkCompany,
+        refresh: () => checkCompany(true),
         createCompany,
     };
 }

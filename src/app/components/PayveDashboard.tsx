@@ -123,9 +123,14 @@ export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
 
   const nextPayrollAmount = stats?.next_payroll?.estimated_amount_usd || monthlyPayroll;
 
+  // Filter out seed/mock transactions (fake hashes like 0x000...0001)
+  const realTransactions = transactions.filter(tx => {
+    const isFakeHash = tx.tx_hash.match(/^0x0{60,}[0-9a-f]{1,4}$/i);
+    return !isFakeHash;
+  });
 
   // Recent transactions for display - always show fallback for demo
-  const recentTransactions = transactions.slice(0, 3).map((tx) => ({
+  const recentTransactions = realTransactions.slice(0, 3).map((tx) => ({
     icon: tx.tx_type === 'distribute' ? CheckCircle : tx.tx_type === 'deposit' ? Plus : SettingsIcon,
     color: tx.tx_type === 'distribute' ? 'text-emerald-400' : tx.tx_type === 'deposit' ? 'text-blue-400' : 'text-slate-400',
     title: tx.tx_type === 'distribute' ? 'Payroll executed' : tx.tx_type === 'deposit' ? 'Deposit received' : 'Transaction',

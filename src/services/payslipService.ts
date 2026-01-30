@@ -207,6 +207,76 @@ export const payslipService = {
 
         return `${API_BASE_URL}/api/payslip/preview?${params.toString()}`;
     },
+
+    /**
+     * Get employee preview URL (no admin wallet required)
+     * Opens payslip in browser for Print to PDF
+     */
+    getEmployeePreviewUrl(
+        salaryUsd: number,
+        employeeName: string,
+        companyName: string,
+        options?: {
+            position?: string;
+            department?: string;
+            paymentDate?: string;
+            maritalStatus?: MaritalStatus;
+            hasNpwp?: boolean;
+            exchangeRate?: number;
+        }
+    ): string {
+        const params = new URLSearchParams({
+            salary_usd: String(salaryUsd),
+            employee_name: employeeName,
+            company_name: companyName,
+            position: options?.position || 'Staff',
+            department: options?.department || 'General',
+            marital_status: options?.maritalStatus || 'TK/0',
+            has_npwp: String(options?.hasNpwp !== false),
+            exchange_rate: String(options?.exchangeRate || DEFAULT_EXCHANGE_RATE),
+        });
+
+        if (options?.paymentDate) {
+            params.append('payment_date', options.paymentDate);
+        }
+
+        return `${API_BASE_URL}/api/payslip/employee-preview?${params.toString()}`;
+    },
+
+    /**
+     * Get employee download URL (no admin wallet required)
+     * Downloads payslip directly as HTML file
+     */
+    getEmployeeDownloadUrl(
+        salaryUsd: number,
+        employeeName: string,
+        companyName: string,
+        options?: {
+            position?: string;
+            department?: string;
+            paymentDate?: string;
+            maritalStatus?: MaritalStatus;
+            hasNpwp?: boolean;
+            exchangeRate?: number;
+        }
+    ): string {
+        const params = new URLSearchParams({
+            salary_usd: String(salaryUsd),
+            employee_name: employeeName,
+            company_name: companyName,
+            position: options?.position || 'Staff',
+            department: options?.department || 'General',
+            marital_status: options?.maritalStatus || 'TK/0',
+            has_npwp: String(options?.hasNpwp !== false),
+            exchange_rate: String(options?.exchangeRate || DEFAULT_EXCHANGE_RATE),
+        });
+
+        if (options?.paymentDate) {
+            params.append('payment_date', options.paymentDate);
+        }
+
+        return `${API_BASE_URL}/api/payslip/employee-download?${params.toString()}`;
+    },
 };
 
 export default payslipService;

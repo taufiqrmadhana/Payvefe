@@ -1,14 +1,14 @@
-import { Wallet, Calendar, FileText, Bell, ArrowUpRight, ArrowDownLeft, Zap, TrendingUp, DollarSign, ExternalLink, Copy, Download, CheckCircle, Clock, Shield, LogOut, User, Settings as SettingsIcon, X, Loader2 } from 'lucide-react';
+import { Wallet, Calendar, FileText, Bell, ArrowUpRight, ArrowDownLeft, Zap, TrendingUp, DollarSign, ExternalLink, Copy, Download, CheckCircle, Clock, Shield, LogOut, User, Settings as SettingsIcon, X, Loader2, Building2, AlertCircle } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePayve, usePayveData } from '@/hooks/usePayve';
 import { WithdrawModal } from '@/app/components/WithdrawModal';
 import { useAccount, useDisconnect } from 'wagmi';
-import { useEmployerConfig, useTransactions, useNotifications } from '@/hooks/useApi';
+import { useEmployerConfig, useTransactions, useNotifications, useEmployeeProfile, useTaxCalculator } from '@/hooks/useApi';
 import { DEFAULT_EXCHANGE_RATE } from '@/constants';
-import { transactionService } from '@/services';
+import { transactionService, payslipService } from '@/services';
 
 interface EmployeeDashboardProps {
   onNavigate: (page: string) => void;
@@ -22,6 +22,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   const [activeModal, setActiveModal] = useState<'payslip' | 'contract' | 'schedule' | 'claim' | 'settings' | null>(null);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
+  const [payslipLoading, setPayslipLoading] = useState(false);
   
   // Employee Feature State
   const [inviteSecret, setInviteSecret] = useState('');
@@ -32,6 +33,44 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   // Fetch Employee Data from Smart Contract
   const { employee } = usePayveData(employerAddress || undefined);
   
+  // Fetch backend employee profile (for company info, employee ID, etc.)
+  const { profile: backendProfile, refresh: refreshProfile } = useEmployeeProfile(address);
+  
+  // Tax calculator
+  const { calculate: calculateTax, loading: taxLoading } = useTaxCalculator();
+  const [taxData, setTaxData] = useState<{ gross: number; net: number; tax: number; breakdown: Record<string, number> } | null>(null);
+  
+  // Calculate tax when salary changes
+  useEffect(() => {
+    const fetchTax = async () => {
+      const salaryFromBackend = backendProfile?.monthly_salary_usd;
+      const salaryFromContract = employee?.salary ? Number(employee.salary) / 1e18 / DEFAULT_EXCHANGE_RATE : 0;
+      const salary = salaryFromBackend ?? salaryFromContract;
+      
+      if (typeof salary === 'number' && salary > 0) {
+        try {
+          const result = await calculateTax(salary);
+          if (result) {
+            setTaxData({
+              gross: result.gross_salary_usd,
+              net: result.net_salary_usd,
+              tax: result.total_deductions_usd,
+              breakdown: {
+                'PPh 21': result.pph21_monthly_usd,
+                'BPJS Kesehatan': result.breakdown?.deductions?.bpjs_kesehatan ? result.breakdown.deductions.bpjs_kesehatan / DEFAULT_EXCHANGE_RATE : 0,
+                'BPJS JHT': result.breakdown?.deductions?.bpjs_jht ? result.breakdown.deductions.bpjs_jht / DEFAULT_EXCHANGE_RATE : 0,
+                'BPJS JP': result.breakdown?.deductions?.bpjs_jp ? result.breakdown.deductions.bpjs_jp / DEFAULT_EXCHANGE_RATE : 0,
+              }
+            });
+          }
+        } catch (err) {
+          console.error('Failed to calculate tax:', err);
+        }
+      }
+    };
+    fetchTax();
+  }, [backendProfile?.monthly_salary_usd, employee?.salary]);
+  
   // Fetch transaction history from backend
   const { 
     transactions: apiTransactions, 
@@ -41,6 +80,14 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   
   // Fetch notifications
   const { unreadCount } = useNotifications(address);
+  
+  // Determine company connection status - check smart contract first
+  const isConnectedToCompany = !!(employee && employee.salary > 0n) || !!backendProfile?.company_name;
+  const companyName = backendProfile?.company_name || (isConnectedToCompany ? 'Connected via Contract' : 'Not Connected');
+  const employeeStatus = backendProfile?.status || (employee && employee.salary > 0n ? 'active' : 'pending');
+  
+  // Check if employee has claimed (has data in smart contract)
+  const hasClaimedInvite = !!(employee && employee.isActive);
 
   // Logout handler
   const handleLogout = () => {
@@ -52,8 +99,15 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   const formatIDRX = (val: bigint | undefined) => val ? (Number(val) / 1e18).toLocaleString() : '0';
   const formatUSD = (val: bigint | undefined) => val ? (Number(val) / 1e18 / DEFAULT_EXCHANGE_RATE).toFixed(2) : '0.00';
   
+  // Filter out seed/mock transactions (fake hashes like 0x000...0001)
+  const realTransactions = apiTransactions.filter(tx => {
+    // Real tx hashes are 66 chars and don't have repeating zeros
+    const isFakeHash = tx.tx_hash.match(/^0x0{60,}[0-9a-f]{1,4}$/i);
+    return !isFakeHash;
+  });
+  
   // Transform API transactions to display format
-  const transactions = apiTransactions.map(tx => {
+  const transactions = realTransactions.map(tx => {
     const isReceive = ['distribute', 'claim_invite'].includes(tx.tx_type);
     const amountUsd = (tx.amount_wei / 1e18 / DEFAULT_EXCHANGE_RATE).toFixed(2);
     const amountIdrx = (tx.amount_wei / 1e18).toLocaleString();
@@ -83,6 +137,9 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
     try {
         const txHash = await claimInvite(employerAddress, inviteSecret);
         
+        // Save employer address to localStorage (auto-save after successful claim)
+        setEmployerAddress(employerAddress);
+        
         // Record transaction to backend
         if (address && txHash) {
             try {
@@ -98,11 +155,25 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
             } catch (e) {
                 console.error("Failed to record tx:", e);
             }
+            
+            // Link wallet to backend employee record
+            // Note: This requires an employee_id which we don't have at claim time
+            // The backend should ideally auto-link based on wallet address
+            // try {
+            //     await employeeService.linkWallet(employeeId, address, employerAddress);
+            //     refreshProfile();
+            // } catch (e) {
+            //     console.error("Failed to link wallet to backend:", e);
+            // }
+            refreshProfile();
         }
         
         alert("Invite claimed successfully! Your wallet is now linked to your employer.");
         setInviteSecret('');
         setActiveModal(null);
+        
+        // Reload page to refresh all data
+        window.location.reload();
     } catch (e) {
         console.error("Claim failed:", e);
         alert("Failed to claim invite. Check console for details.");
@@ -118,6 +189,52 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
           return;
       }
       setIsWithdrawOpen(true);
+  };
+
+  // Handle payslip download - direct download as HTML file
+  const handleDownloadPayslip = async () => {
+    if (!isConnectedToCompany || !employee) {
+      alert("Cannot download payslip: Please link your wallet to a company first.");
+      return;
+    }
+    
+    setPayslipLoading(true);
+    try {
+      // Calculate salary in USD from smart contract data
+      const salaryUsd = Number(employee.salary) / 1e18 / DEFAULT_EXCHANGE_RATE;
+      const employeeName = backendProfile?.full_name || employee.name || 'Employee';
+      const companyDisplayName = backendProfile?.company_name || companyName || 'Company';
+      const position = backendProfile?.position || 'Staff';
+      const department = backendProfile?.department || 'General';
+      
+      // Use employee download endpoint - downloads directly as file
+      const downloadUrl = payslipService.getEmployeeDownloadUrl(
+        salaryUsd,
+        employeeName,
+        companyDisplayName,
+        {
+          position,
+          department,
+          paymentDate: new Date().toISOString().slice(0, 10),
+          maritalStatus: 'TK/0',
+          hasNpwp: true,
+          exchangeRate: DEFAULT_EXCHANGE_RATE
+        }
+      );
+      
+      // Trigger direct download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `payslip_${employeeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 7)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download payslip:', err);
+      alert('Failed to download payslip. Please try again.');
+    } finally {
+      setPayslipLoading(false);
+    }
   };
 
   return (
@@ -160,7 +277,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-lg border-2 border-white/10 hover:shadow-cyan-500/50 transition-all"
                 >
-                  EMP
+                  {(backendProfile?.full_name || employee?.name || 'E')[0].toUpperCase()}
                 </button>
                 
                 {/* Dropdown Menu */}
@@ -170,17 +287,30 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                       className="fixed inset-0 z-40" 
                       onClick={() => setShowProfileMenu(false)}
                     ></div>
-                    <div className="absolute right-0 top-14 w-64 bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 backdrop-blur-xl">
+                    <div className="absolute right-0 top-14 w-72 bg-slate-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 backdrop-blur-xl">
                       <div className="p-4 border-b border-white/10">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold">
-                            EMP
+                            {(backendProfile?.full_name || employee?.name || 'E')[0].toUpperCase()}
                           </div>
-                          <div>
-                            <p className="text-white font-semibold">{employee ? employee.name : "Employee"}</p>
-                            <p className="text-xs text-slate-400">user@payve.com</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-semibold truncate">{backendProfile?.full_name || employee?.name || 'Employee'}</p>
+                            <p className="text-xs text-slate-400 truncate">{backendProfile?.position || 'Employee'}</p>
                           </div>
                         </div>
+                        
+                        {/* Company Info */}
+                        {isConnectedToCompany && (
+                          <div className="mt-3 p-2 bg-slate-700/50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-cyan-400" />
+                              <span className="text-sm text-white font-medium truncate">{companyName}</span>
+                            </div>
+                            {backendProfile?.department && (
+                              <p className="text-xs text-slate-400 mt-1 ml-6">{backendProfile.department}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="p-2">
                         <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-700/50 transition-all text-left">
@@ -221,9 +351,31 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
           <div className="absolute bottom-0 left-0 w-32 h-32 sm:w-48 sm:h-48 bg-cyan-400/20 rounded-full blur-3xl"></div>
           
           <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-3">
-              <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-white/90" />
-              <p className="text-xs sm:text-sm uppercase text-white/90 tracking-wide font-semibold">Ready to Withdraw</p>
+            {/* Company Connection Status */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-white/90" />
+                <p className="text-xs sm:text-sm uppercase text-white/90 tracking-wide font-semibold">Ready to Withdraw</p>
+              </div>
+              
+              {/* Company Badge */}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg backdrop-blur-sm ${
+                isConnectedToCompany 
+                  ? 'bg-emerald-500/20 border border-emerald-500/30' 
+                  : 'bg-amber-500/20 border border-amber-500/30'
+              }`}>
+                <Building2 className={`w-4 h-4 ${isConnectedToCompany ? 'text-emerald-300' : 'text-amber-300'}`} />
+                <span className={`text-xs font-semibold ${isConnectedToCompany ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {isConnectedToCompany ? companyName : 'No Company Linked'}
+                </span>
+                {isConnectedToCompany && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    employeeStatus === 'active' ? 'bg-emerald-500/30 text-emerald-200' : 'bg-amber-500/30 text-amber-200'
+                  }`}>
+                    {employeeStatus?.toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
             
             <div className="mb-6 sm:mb-8">
@@ -243,26 +395,38 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
                 onClick={handleWithdrawOpen}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-6 sm:px-8 h-11 sm:h-12 rounded-xl font-bold shadow-lg shadow-cyan-500/25 hover:shadow-xl hover:shadow-cyan-500/30 transition-all w-full sm:w-auto"
+                disabled={!isConnectedToCompany}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-6 sm:px-8 h-11 sm:h-12 rounded-xl font-bold shadow-lg shadow-cyan-500/25 hover:shadow-xl hover:shadow-cyan-500/30 transition-all w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ArrowDownLeft className="w-5 h-5 mr-2" />
                 Withdraw to Bank
               </Button>
               
-              <Button 
-                onClick={() => setActiveModal('claim')}
-                className="bg-slate-800/80 hover:bg-slate-700/80 border border-white/20 text-white px-4 sm:px-6 h-11 sm:h-12 rounded-xl font-semibold backdrop-blur-sm w-full sm:w-auto"
-              >
-                <CheckCircle className="w-5 h-5 mr-2" />
-                Claim Job Invite
-              </Button>
+              {/* Show different button based on claim status */}
+              {hasClaimedInvite ? (
+                <Button 
+                  onClick={() => setActiveModal('settings')}
+                  className="bg-emerald-600/80 hover:bg-emerald-500/80 border border-emerald-400/30 text-white px-4 sm:px-6 h-11 sm:h-12 rounded-xl font-semibold backdrop-blur-sm w-full sm:w-auto"
+                >
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Job Linked ✓
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => setActiveModal('claim')}
+                  className="bg-slate-800/80 hover:bg-slate-700/80 border border-white/20 text-white px-4 sm:px-6 h-11 sm:h-12 rounded-xl font-semibold backdrop-blur-sm w-full sm:w-auto"
+                >
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Claim Job Invite
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Current Salary */}
+          {/* Current Salary - with Tax Info */}
           <div className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-blue-500/50 transition-all shadow-lg hover:shadow-blue-500/20">
             <div className="flex items-start justify-between mb-4">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-blue-500/50 transition-all">
@@ -273,10 +437,24 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
               </div>
             </div>
             <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide font-semibold">Current Salary</p>
-            <p className="text-4xl font-bold text-white mb-1">
-                ${formatUSD(employee?.salary)}
-            </p>
-            <p className="text-sm text-slate-500">Net after taxes</p>
+            {taxData ? (
+              <>
+                <p className="text-4xl font-bold text-white mb-1">
+                  ${taxData.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-500">Gross: ${taxData.gross.toLocaleString()}</span>
+                  <span className="text-red-400">- ${taxData.tax.toLocaleString()} tax</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-4xl font-bold text-white mb-1">
+                  ${formatUSD(employee?.salary)}
+                </p>
+                <p className="text-sm text-slate-500">{taxLoading ? 'Calculating taxes...' : 'Net after taxes'}</p>
+              </>
+            )}
           </div>
 
           {/* Next Payroll */}
@@ -300,14 +478,33 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
               <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-emerald-500/50 transition-all">
                 <Shield className="w-7 h-7 text-white" />
               </div>
-              <div className="flex items-center gap-1 px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
-                <CheckCircle className="w-3 h-3 text-emerald-300" />
-                <p className="text-xs text-emerald-300 font-semibold">Active</p>
+              <div className={`flex items-center gap-1 px-3 py-1 rounded-lg ${
+                isConnectedToCompany 
+                  ? 'bg-emerald-500/20 border border-emerald-500/30'
+                  : 'bg-amber-500/20 border border-amber-500/30'
+              }`}>
+                {isConnectedToCompany ? (
+                  <>
+                    <CheckCircle className="w-3 h-3 text-emerald-300" />
+                    <p className="text-xs text-emerald-300 font-semibold">Linked</p>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3 h-3 text-amber-300" />
+                    <p className="text-xs text-amber-300 font-semibold">Setup Required</p>
+                  </>
+                )}
               </div>
             </div>
             <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide font-semibold">Contract Status</p>
-            <p className="text-4xl font-bold text-emerald-400 mb-1">Active</p>
-            <p className="text-sm text-slate-500">Until Dec 31, 2026</p>
+            <p className={`text-4xl font-bold mb-1 ${isConnectedToCompany ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {isConnectedToCompany ? 'Active' : 'Pending'}
+            </p>
+            <p className="text-sm text-slate-500">
+              {isConnectedToCompany 
+                ? (backendProfile?.position || 'Employee') 
+                : 'Link employer to activate'}
+            </p>
           </div>
         </div>
 
@@ -500,80 +697,138 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
       {/* Modals */}
       {activeModal === 'payslip' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-slate-800 rounded-2xl sm:rounded-3xl border border-white/10 shadow-2xl overflow-hidden my-8">
+          <div className="relative w-full max-w-lg bg-slate-800 rounded-2xl border border-white/10 shadow-2xl overflow-hidden my-8">
             <button 
               onClick={() => setActiveModal(null)}
-              className="absolute top-3 right-3 sm:top-4 sm:right-4 w-9 h-9 sm:w-10 sm:h-10 bg-slate-700/50 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all z-10"
+              className="absolute top-3 right-3 w-9 h-9 bg-slate-700/50 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all z-10"
             >
               <X className="w-5 h-5 text-white" />
             </button>
 
-            <div className="p-6 sm:p-8">
-              <div className="flex items-center gap-3 sm:gap-4 mb-6">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                  <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
+                  <FileText className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-white">Payslip</h2>
-                  <p className="text-sm sm:text-base text-slate-400">January 2026</p>
+                  <h2 className="text-2xl font-bold text-white">Payslip</h2>
+                  <p className="text-slate-400">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
                 </div>
               </div>
 
-              <div className="bg-slate-700/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Employee Name</span>
-                    <span className="text-white font-semibold">{employee?.name || 'N/A'}</span>
+              {/* Employee Info Card */}
+              <div className="bg-slate-700/50 rounded-xl p-4 mb-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-slate-500 text-xs uppercase">Name</p>
+                    <p className="text-white font-medium">{backendProfile?.full_name || employee?.name || 'N/A'}</p>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Wallet Address</span>
-                    <span className="text-white font-mono text-sm">{address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'N/A'}</span>
+                  <div>
+                    <p className="text-slate-500 text-xs uppercase">Company</p>
+                    <p className="text-cyan-400 font-medium">{companyName !== 'Not Connected' ? companyName : 'N/A'}</p>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Status</span>
-                    <span className="text-emerald-400 font-semibold">{employee?.isActive ? 'Active' : 'Inactive'}</span>
+                  <div>
+                    <p className="text-slate-500 text-xs uppercase">Position</p>
+                    <p className="text-white font-medium">{backendProfile?.position || 'Staff'}</p>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Payment Date</span>
-                    <span className="text-white font-semibold">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <div>
+                    <p className="text-slate-500 text-xs uppercase">Department</p>
+                    <p className="text-white font-medium">{backendProfile?.department || 'General'}</p>
                   </div>
-                  
-                  <div className="h-px bg-gradient-to-r from-blue-500/30 to-cyan-500/30 my-4"></div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Monthly Salary (Gross)</span>
-                    <span className="text-white font-semibold">${formatUSD(employee?.salary)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Salary in IDRX</span>
-                    <span className="text-white font-semibold">{formatIDRX(employee?.salary)} IDRX</span>
-                  </div>
-                  
-                  <div className="h-px bg-gradient-to-r from-blue-500/30 to-cyan-500/30 my-4"></div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-white font-bold text-lg">Current Balance</span>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">${formatUSD(employee?.balance)}</p>
-                      <p className="text-sm text-slate-400">{formatIDRX(employee?.balance)} IDRX</p>
+                </div>
+              </div>
+
+              {/* Salary Breakdown */}
+              <div className="bg-slate-700/30 rounded-xl p-4 mb-4 space-y-3">
+                {/* Gross */}
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Gross Salary</span>
+                  <span className="text-white font-semibold">
+                    ${taxData?.gross?.toLocaleString(undefined, {minimumFractionDigits: 2}) || formatUSD(employee?.salary)}
+                  </span>
+                </div>
+                
+                {/* Tax Deductions */}
+                {taxData && taxData.tax > 0 && (
+                  <>
+                    <div className="h-px bg-white/10"></div>
+                    <div className="space-y-2">
+                      {taxData.breakdown && Object.entries(taxData.breakdown)
+                        .filter(([_, value]) => value > 0)
+                        .map(([key, value]) => (
+                        <div key={key} className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500">{key}</span>
+                          <span className="text-red-400">-${value.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                      ))}
                     </div>
+                    <div className="h-px bg-white/10"></div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-400">Total Deductions</span>
+                      <span className="text-red-400 font-medium">-${taxData.tax.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </div>
+                  </>
+                )}
+                
+                {/* Net Salary */}
+                <div className="h-px bg-white/10"></div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-white font-semibold">Net Salary</span>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-emerald-400">
+                      ${taxData?.net?.toLocaleString(undefined, {minimumFractionDigits: 2}) || formatUSD(employee?.salary)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      ≈ {((taxData?.net || Number(employee?.salary || 0n) / 1e18 / DEFAULT_EXCHANGE_RATE) * DEFAULT_EXCHANGE_RATE).toLocaleString()} IDRX
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button className="flex-1 h-11 sm:h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg">
-                  <Download className="w-5 h-5 mr-2" />
-                  Download PDF
+              {/* Current Balance */}
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-emerald-400 text-sm font-medium">Available Balance</p>
+                    <p className="text-xs text-slate-500">Ready to withdraw</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-emerald-400">${formatUSD(employee?.balance)}</p>
+                    <p className="text-xs text-slate-500">{formatIDRX(employee?.balance)} IDRX</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleDownloadPayslip}
+                  disabled={payslipLoading || !isConnectedToCompany}
+                  className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl shadow-lg disabled:opacity-50"
+                >
+                  {payslipLoading ? (
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-5 h-5 mr-2" />
+                  )}
+                  {payslipLoading ? 'Downloading...' : 'Download Payslip'}
                 </Button>
                 <Button 
                   onClick={() => setActiveModal(null)}
                   variant="outline" 
-                  className="h-11 sm:h-12 px-6 border-white/20 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl"
+                  className="h-12 px-5 border-white/20 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl"
                 >
                   Close
                 </Button>
               </div>
+              
+              {!isConnectedToCompany && (
+                <p className="text-amber-400 text-xs text-center mt-3 flex items-center justify-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Link your wallet to a company to download payslips
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -821,6 +1076,21 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                 <h2 className="text-2xl font-bold text-white mb-2">Job Settings</h2>
                 <p className="text-slate-400">Manage your employment connection.</p>
             </div>
+
+            {/* Connection Status */}
+            {isConnectedToCompany && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Building2 className="w-5 h-5 text-emerald-400" />
+                  <span className="text-emerald-400 font-semibold">Connected to Company</span>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p className="text-white">{companyName}</p>
+                  {backendProfile?.position && <p className="text-slate-400">{backendProfile.position}</p>}
+                  {backendProfile?.department && <p className="text-slate-400">{backendProfile.department}</p>}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
                 <div>

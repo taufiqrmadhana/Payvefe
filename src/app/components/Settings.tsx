@@ -13,6 +13,7 @@ import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 import { PayveAddEmployee } from '@/app/components/PayveAddEmployee';
 import { useCompany } from '@/hooks/useApi';
+import { transactionService } from '@/services';
 import { 
   Transaction, 
   TransactionButton, 
@@ -270,10 +271,26 @@ export function Settings({ onNavigate }: SettingsProps) {
                                               console.error("Transaction Error:", err);
                                               alert(`Transaction failed: ${err.message || 'Unknown error'}`);
                                             }}
-                                            onSuccess={(res) => { 
+                                            onSuccess={async (res) => { 
                                               console.log("Success", res); 
                                               refetchBalance(); 
                                               refetchUserBalance();
+                                              // Record deposit transaction to backend
+                                              if (address && res.transactionReceipts?.[0]?.transactionHash) {
+                                                try {
+                                                  const depositAmountWei = parseEther(depositAmount || '0');
+                                                  await transactionService.create({
+                                                    wallet_address: address,
+                                                    tx_hash: res.transactionReceipts[0].transactionHash,
+                                                    tx_type: 'deposit',
+                                                    amount_wei: Number(depositAmountWei),
+                                                    status: 'success',
+                                                    metadata: { company_contract: myCompanyAddress },
+                                                  });
+                                                } catch (e) {
+                                                  console.error("Failed to record deposit tx:", e);
+                                                }
+                                              }
                                               alert("Top Up successful!");
                                             }}
                                         >

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 import { usePayve } from '@/hooks/usePayve';
-import { useReadContract } from 'wagmi';
+import { useReadContract, useAccount } from 'wagmi';
 import PayveABI from '@/abis/Payve.json';
+import { transactionService } from '@/services';
 
 interface PayvePayrollExecutionProps {
   onNavigate: (page: string) => void;
@@ -20,6 +21,7 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
   const [isMobile, setIsMobile] = useState(false);
   
   const { distribute, myCompanyAddress } = usePayve();
+  const { address } = useAccount();
   const [isExecuting, setIsExecuting] = useState(false);
 
   // Fetch Real Data
@@ -32,6 +34,16 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
          refetchInterval: 5000
       }
   });
+  
+  // Fetch all employees for transaction recording
+  const { data: employeesRaw } = useReadContract({
+      abi: PayveABI.abi,
+      address: myCompanyAddress,
+      functionName: 'getAllEmployees',
+      query: { enabled: !!myCompanyAddress }
+  });
+  
+  const employees = employeesRaw as Array<{ wallet: string; name: string; salary: bigint; balance: bigint; isActive: boolean }> | undefined;
   
   const payrollStatus = payrollStatusRaw as any; // Cast to any to bypass generic JSON type issues
 
@@ -50,7 +62,6 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
   // Formatting helper
   const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -66,7 +77,45 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
         setIsExecuting(true);
         try {
           setCurrentStep(1); // Preparing
-          await distribute(); // Uses myCompanyAddress internally in updated usePayve
+          const txHash = await distribute(); // Uses myCompanyAddress internally in updated usePayve
+          
+          // Record transactions to backend for each employee
+          if (txHash && employees && address) {
+            try {
+              // Record main distribute transaction for admin
+              await transactionService.create({
+                wallet_address: address,
+                tx_hash: txHash,
+                tx_type: 'distribute',
+                amount_wei: Number(totalSalaryWei),
+                status: 'success',
+                metadata: { 
+                  company_contract: myCompanyAddress,
+                  employee_count: employees.length 
+                },
+              });
+              
+              // Record distribute transaction for each active employee
+              for (const emp of employees) {
+                if (emp.isActive && emp.wallet) {
+                  await transactionService.create({
+                    wallet_address: emp.wallet,
+                    tx_hash: txHash,
+                    tx_type: 'distribute',
+                    amount_wei: Number(emp.salary),
+                    status: 'success',
+                    metadata: { 
+                      company_contract: myCompanyAddress,
+                      employee_name: emp.name
+                    },
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Failed to record transactions:", e);
+            }
+          }
+          
           setCurrentStep(5); // Done
           setProgress(100);
           setStage('success');
@@ -80,7 +129,7 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
       }
     };
     runPayroll();
-  }, [stage, distribute, isExecuting]);
+  }, [stage, distribute, isExecuting, employees, address, totalSalaryWei, myCompanyAddress]);
 
   if (!myCompanyAddress) {
       return (

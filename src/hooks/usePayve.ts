@@ -135,7 +135,7 @@ export function usePayve() {
 
 export function usePayveData(contractAddress: string | undefined) {
     const { address } = useAccount();
-    const { data: employee } = useReadContract({
+    const { data: employee, isLoading, error } = useReadContract({
         abi: PayveABI.abi,
         address: contractAddress ? contractAddress as `0x${string}` : undefined,
         functionName: 'getEmployee',
@@ -145,14 +145,32 @@ export function usePayveData(contractAddress: string | undefined) {
         }
     });
 
-    // Cast to proper type - smart contract returns tuple [name, salary, balance, isActive]
-    const typedEmployee = employee as [string, bigint, bigint, boolean] | undefined;
-    const employeeData: EmployeeData | undefined = typedEmployee ? {
-        name: typedEmployee[0],
-        salary: typedEmployee[1],
-        balance: typedEmployee[2],
-        isActive: typedEmployee[3],
-    } : undefined;
+    // Smart contract returns object with named properties OR tuple array depending on ABI
+    // Handle both cases
+    let employeeData: EmployeeData | undefined;
+    
+    if (employee) {
+        // Check if it's an object with named properties
+        if (typeof employee === 'object' && 'name' in employee) {
+            const obj = employee as { name: string; salary: bigint; balance: bigint; isActive: boolean };
+            employeeData = {
+                name: obj.name,
+                salary: obj.salary,
+                balance: obj.balance,
+                isActive: obj.isActive,
+            };
+        } 
+        // Or if it's a tuple array [name, salary, balance, isActive]
+        else if (Array.isArray(employee)) {
+            const arr = employee as [string, bigint, bigint, boolean];
+            employeeData = {
+                name: arr[0],
+                salary: arr[1],
+                balance: arr[2],
+                isActive: arr[3],
+            };
+        }
+    }
 
-    return { employee: employeeData };
+    return { employee: employeeData, isLoading, error };
 }
