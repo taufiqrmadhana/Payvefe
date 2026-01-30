@@ -1,4 +1,4 @@
-import { Menu, X, Bell, Search, ChevronDown } from 'lucide-react';
+import { Menu, X, Bell, Search, ChevronDown, Building2, Users, Wallet as WalletIcon } from 'lucide-react';
 import {
   Wallet,
   ConnectWallet,
@@ -13,6 +13,8 @@ import {
   Identity,
   EthBalance
 } from '@coinbase/onchainkit/identity';
+import { useAccount } from 'wagmi';
+import { useDashboard, useCompany } from '@/hooks/useApi';
 
 interface CompanyHeaderProps {
   title: string;
@@ -37,6 +39,10 @@ export function CompanyHeader({
   showNotifications = true,
   children
 }: CompanyHeaderProps) {
+  const { address } = useAccount();
+  const { company } = useCompany(address);
+  const { stats } = useDashboard(address);
+
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
       <div className="px-4 sm:px-8 py-4 sm:py-5">
@@ -102,20 +108,54 @@ export function CompanyHeader({
                     <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
                   </div>
                 </ConnectWallet>
-                <WalletDropdown className="!bg-[#0f172a] !border !border-slate-800 !rounded-2xl !shadow-2xl !mt-3 !overflow-hidden !min-w-[300px] !p-0 ring-1 ring-white/10">
-                  <div className="p-5 border-b border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950">
-                    <Identity hasCopyAddressOnClick className="!flex !flex-row !items-center !gap-4">
-                      <Avatar className="!h-14 !w-14 !rounded-2xl !ring-4 !ring-slate-800 shadow-xl" />
-                      <div className="flex-1 min-w-0 flex flex-col gap-1">
-                        <Name className="!text-white !font-bold !text-lg tracking-tight" />
-                        <Address className="!text-xs !text-slate-400 !bg-slate-800/50 !px-2 !py-1 !rounded-lg" />
+                <WalletDropdown className="!bg-[#0f172a] !border !border-slate-800 !rounded-2xl !shadow-2xl !mt-3 !overflow-hidden !min-w-[320px] !p-0 ring-1 ring-white/10">
+                  {/* Company Info Section */}
+                  <div className="p-4 border-b border-slate-800 bg-gradient-to-br from-blue-500/10 to-cyan-500/10">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                        <Building2 className="w-5 h-5 text-white" />
                       </div>
-                    </Identity>
-                    <div className="mt-4 p-3.5 bg-slate-900/50 rounded-xl border border-slate-800 flex items-center justify-between group hover:border-cyan-500/30 transition-colors">
-                      <span className="text-xs font-medium text-slate-400">Balance</span>
-                      <EthBalance className="!text-xl !font-bold !text-cyan-400" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-white truncate">{company?.company_name || 'My Company'}</div>
+                        <div className="text-xs text-emerald-400 font-medium">● Active</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2.5 bg-slate-800/50 rounded-lg border border-white/5">
+                        <div className="text-[10px] text-slate-500 uppercase font-medium mb-0.5">Balance</div>
+                        <div className="text-sm font-bold text-emerald-400">
+                          ${((stats?.financials?.balance_usd ?? 0)).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="p-2.5 bg-slate-800/50 rounded-lg border border-white/5">
+                        <div className="text-[10px] text-slate-500 uppercase font-medium mb-0.5">Employees</div>
+                        <div className="text-sm font-bold text-cyan-400 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {stats?.employees?.total ?? 0}
+                        </div>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Wallet Info Section */}
+                  <div className="p-4 border-b border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950">
+                    <Identity hasCopyAddressOnClick className="!flex !flex-row !items-center !gap-3">
+                      <Avatar className="!h-12 !w-12 !rounded-xl !ring-2 !ring-slate-700 shadow-lg" />
+                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <Name className="!text-white !font-bold !text-base tracking-tight" />
+                        <Address className="!text-xs !text-slate-400" />
+                      </div>
+                    </Identity>
+                    <div className="mt-3 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                        <WalletIcon className="w-3.5 h-3.5" />
+                        ETH Balance
+                      </span>
+                      <EthBalance className="!text-lg !font-bold !text-white" />
+                    </div>
+                  </div>
+
+                  {/* Actions */}
                   <div className="p-2 bg-slate-950">
                     <WalletDropdownLink
                       icon="wallet"
@@ -139,18 +179,42 @@ export function CompanyHeader({
                 >
                   <Avatar className="!h-5 !w-5 !rounded-md" />
                 </ConnectWallet>
-                <WalletDropdown className="!bg-slate-900 !border !border-white/10 !rounded-2xl !shadow-2xl !mt-2 !overflow-hidden !min-w-[260px] !right-0">
-                  <div className="p-4 border-b border-white/10 bg-gradient-to-br from-blue-600/10 to-cyan-600/10">
+                <WalletDropdown className="!bg-slate-900 !border !border-white/10 !rounded-2xl !shadow-2xl !mt-2 !overflow-hidden !min-w-[280px] !right-0">
+                  {/* Company Info */}
+                  <div className="p-3 border-b border-white/10 bg-gradient-to-br from-blue-500/10 to-cyan-500/10">
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-white text-sm truncate">{company?.company_name || 'My Company'}</div>
+                        <div className="text-[10px] text-emerald-400">● Active</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2 bg-slate-800/50 rounded-lg">
+                        <div className="text-[10px] text-slate-500">Balance</div>
+                        <div className="text-xs font-bold text-emerald-400">${((stats?.financials?.balance_usd ?? 0)).toLocaleString()}</div>
+                      </div>
+                      <div className="p-2 bg-slate-800/50 rounded-lg">
+                        <div className="text-[10px] text-slate-500">Employees</div>
+                        <div className="text-xs font-bold text-cyan-400">{stats?.employees?.total ?? 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Wallet Info */}
+                  <div className="p-3 border-b border-white/10">
                     <Identity hasCopyAddressOnClick>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="!h-10 !w-10 !rounded-xl !ring-2 !ring-cyan-500/30" />
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="!h-9 !w-9 !rounded-lg !ring-2 !ring-slate-700" />
                         <div className="flex-1 min-w-0">
-                          <Name className="!text-white !font-semibold" />
-                          <Address className="!text-xs !text-slate-400" />
+                          <Name className="!text-white !font-semibold !text-sm" />
+                          <Address className="!text-[10px] !text-slate-400" />
                         </div>
                       </div>
-                      <div className="mt-3 p-2 bg-slate-800/50 rounded-lg border border-white/5">
-                        <EthBalance className="!text-sm !font-bold !text-cyan-400" />
+                      <div className="mt-2 p-2 bg-slate-800/50 rounded-lg flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">ETH Balance</span>
+                        <EthBalance className="!text-sm !font-bold !text-white" />
                       </div>
                     </Identity>
                   </div>

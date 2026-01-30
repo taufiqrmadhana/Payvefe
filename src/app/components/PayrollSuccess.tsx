@@ -152,7 +152,7 @@ export function PayrollSuccess({ onNavigate }: PayrollSuccessProps) {
             Return to Dashboard
           </Button>
           <Button 
-            onClick={() => onNavigate('payroll-confirmation')}
+            onClick={() => onNavigate('payroll-execution')}
             variant="outline"
             className="px-12 h-10"
           >

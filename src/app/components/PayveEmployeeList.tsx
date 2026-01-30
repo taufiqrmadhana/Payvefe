@@ -95,7 +95,7 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
     const selectedData = employees.filter(e => selectedEmployees.includes(e.id));
     sessionStorage.setItem('selectedEmployeesForPayroll', JSON.stringify(selectedData));
     
-    onNavigate('payroll-confirmation');
+    onNavigate('payroll-execution');
   }, [selectedEmployees, employees, onNavigate]);
 
   // Export selected employees to CSV

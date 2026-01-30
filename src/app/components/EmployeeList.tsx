@@ -328,7 +328,7 @@ export function EmployeeList({ onNavigate }: EmployeeListProps) {
           
           <div className="flex items-center gap-3">
             <Button 
-              onClick={() => onNavigate('payroll-confirmation')}
+              onClick={() => onNavigate('payroll-execution')}
               className="bg-[#1E40AF] hover:bg-[#1e3a8a] text-white h-9 text-sm"
             >
               Execute Payroll

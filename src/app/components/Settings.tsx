@@ -120,18 +120,32 @@ export function Settings({ onNavigate }: SettingsProps) {
       console.warn("Cannot construct calls: Missing address");
       return [];
     }
+
+    const depositAmountWei = parseEther(depositAmount || '0');
+    const userBalanceWei = userBalance ? BigInt(userBalance.toString()) : BigInt(0);
+    
+    // Check if user has enough balance
+    if (depositAmountWei > userBalanceWei) {
+      console.warn("Insufficient balance for deposit");
+      return [];
+    }
+    
+    if (depositAmountWei <= BigInt(0)) {
+      console.warn("Invalid deposit amount");
+      return [];
+    }
     
     try {
       const approveData = encodeFunctionData({
         abi: MockIDRXABI.abi,
         functionName: 'approve',
-        args: [myCompanyAddress, parseEther(depositAmount || '0')]
+        args: [myCompanyAddress, depositAmountWei]
       });
 
       const depositData = encodeFunctionData({
         abi: PayveABI.abi,
         functionName: 'deposit',
-        args: [parseEther(depositAmount || '0')]
+        args: [depositAmountWei]
       });
       
       return [
@@ -150,7 +164,7 @@ export function Settings({ onNavigate }: SettingsProps) {
       console.error("Error encoding function data:", err);
       return [];
     }
-  }, [myCompanyAddress, depositAmount]);
+  }, [myCompanyAddress, depositAmount, userBalance]);
 
   return (
     <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
@@ -178,10 +192,13 @@ export function Settings({ onNavigate }: SettingsProps) {
                       <Loader2 className="w-12 h-12 text-cyan-400 mx-auto mb-4 animate-spin" />
                       <p className="text-slate-400">Loading company data...</p>
                     </div>
-                  ) : !backendCompanyExists && !myCompanyAddress ? (
+                  ) : !myCompanyAddress ? (
+                      // No on-chain company - show deploy button
                       <div className="p-8 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 text-center">
                           <Building2 className="w-16 h-16 text-cyan-400 mx-auto mb-4 opacity-80" />
-                          <h2 className="text-2xl font-bold text-white mb-2">Create Your Organization</h2>
+                          <h2 className="text-2xl font-bold text-white mb-2">
+                            {backendCompanyExists ? `Deploy Contract for ${backendCompany?.company_name}` : 'Create Your Organization'}
+                          </h2>
                           <p className="text-slate-400 mb-6 max-w-md mx-auto">
                               Deploy your own secure Payroll Smart Contract on Base. 
                               One contract per company ensures complete asset isolation.
@@ -191,7 +208,7 @@ export function Settings({ onNavigate }: SettingsProps) {
                               disabled={isCreatingCompany}
                               className="h-12 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/20"
                           >
-                              {isCreatingCompany ? "Deploying Contract..." : "Create Company Contract"}
+                              {isCreatingCompany ? "Deploying Contract..." : "Deploy Company Contract"}
                           </Button>
                       </div>
                   ) : (
@@ -249,8 +266,16 @@ export function Settings({ onNavigate }: SettingsProps) {
                                             calls={depositCalls}
                                             className="w-full"
                                             chainId={84532} // Base Sepolia
-                                            onError={(err) => { console.error("Transaction Error:", err); }}
-                                            onSuccess={(res) => { console.log("Success", res); refetchBalance(); refetchUserBalance(); }}
+                                            onError={(err) => { 
+                                              console.error("Transaction Error:", err);
+                                              alert(`Transaction failed: ${err.message || 'Unknown error'}`);
+                                            }}
+                                            onSuccess={(res) => { 
+                                              console.log("Success", res); 
+                                              refetchBalance(); 
+                                              refetchUserBalance();
+                                              alert("Top Up successful!");
+                                            }}
                                         >
                                           <TransactionButton className="h-10 w-full bg-slate-800 hover:bg-slate-700 text-white rounded-md" text="Top Up" />
                                           <TransactionStatus>
@@ -264,7 +289,13 @@ export function Settings({ onNavigate }: SettingsProps) {
                                         </Transaction>
                                       ) : (
                                         <Button disabled className="w-full h-10 bg-slate-800 text-slate-500">
-                                          {!myCompanyAddress ? "Deploy Contract First" : "Loading..."}
+                                          {!myCompanyAddress 
+                                            ? "Deploy Contract First" 
+                                            : !userBalance || Number(userBalance) === 0
+                                              ? "Mint IDRX First"
+                                              : parseFloat(depositAmount || '0') > Number(userBalance) / 1e18
+                                                ? "Insufficient Balance"
+                                                : "Enter Amount"}
                                         </Button>
                                       )}
                                     </div>

@@ -84,11 +84,25 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
 
   if (!myCompanyAddress) {
       return (
-          <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
-              <div className="text-center">
-                  <h2 className="text-2xl font-bold mb-4">No Company Found</h2>
-                  <Button onClick={() => onNavigate('settings')}>Create Company</Button>
-              </div>
+          <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+              <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+              <main className="flex-1 flex items-center justify-center">
+                  <div className="text-center p-8 bg-slate-800/50 rounded-2xl border border-white/10 max-w-md mx-4">
+                      <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                          <Zap className="w-8 h-8 text-white" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-3">No Smart Contract Company</h2>
+                      <p className="text-slate-400 mb-6">
+                          You need to create an on-chain company first to execute payroll via smart contracts.
+                      </p>
+                      <Button 
+                          onClick={() => onNavigate('settings')}
+                          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-6 py-3 rounded-xl"
+                      >
+                          Go to Settings
+                      </Button>
+                  </div>
+              </main>
           </div>
       );
   }
@@ -250,138 +264,190 @@ export function PayvePayrollExecution({ onNavigate }: PayvePayrollExecutionProps
 
   if (stage === 'confirm') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 flex items-center justify-center p-4 sm:p-8">
-        <div className="max-w-2xl w-full bg-slate-800/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10">
-          <div className="text-center mb-6 sm:mb-8">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
-              <Shield className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+      <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+        <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <main className="flex-1 overflow-y-auto">
+          <CompanyHeader 
+            title="Confirm Payroll"
+            subtitle="Review and confirm payroll execution"
+          />
+          
+          <div className="max-w-2xl mx-auto p-4 lg:p-8">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/10">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50">
+                  <Shield className="w-10 h-10 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-2">Confirm Payroll Execution</h2>
+                <p className="text-red-400 font-semibold">This action cannot be undone</p>
+              </div>
+
+              {/* Checklist */}
+              <div className="space-y-4 mb-8">
+                <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/30 cursor-pointer transition-all bg-slate-700/30">
+                  <input 
+                    type="checkbox" 
+                    checked={checked.verify}
+                    onChange={(e) => setChecked({ ...checked, verify: e.target.checked })}
+                    className="w-5 h-5 mt-0.5 accent-cyan-600"
+                  />
+                  <span className="text-white font-medium">I have verified all employee details</span>
+                </label>
+
+                <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/30 cursor-pointer transition-all bg-slate-700/30">
+                  <input 
+                    type="checkbox"
+                    checked={checked.irreversible}
+                    onChange={(e) => setChecked({ ...checked, irreversible: e.target.checked })}
+                    className="w-5 h-5 mt-0.5 accent-cyan-600"
+                  />
+                  <span className="text-white font-medium">I understand this transaction is irreversible</span>
+                </label>
+
+                <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/30 cursor-pointer transition-all bg-slate-700/30">
+                  <input 
+                    type="checkbox"
+                    checked={checked.amounts}
+                    onChange={(e) => setChecked({ ...checked, amounts: e.target.checked })}
+                    className="w-5 h-5 mt-0.5 accent-cyan-600"
+                  />
+                  <span className="text-white font-medium">I confirm the payment amounts are correct</span>
+                </label>
+              </div>
+
+              {/* Final Amount */}
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-2 border-cyan-500/30 mb-8">
+                <div className="text-center">
+                  <div className="text-sm text-slate-400 mb-2">You are about to transfer:</div>
+                  <div className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2">${totalSalaryUSD}</div>
+                  <div className="text-slate-300 mb-1">{fmt(totalSalaryIDRX)} IDRX</div>
+                  <div className="text-sm text-slate-500">To {employeeCount} employees</div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4">
+                <Button 
+                  onClick={() => setStage('review')}
+                  variant="outline"
+                  className="flex-1 h-14 rounded-xl border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
+                >
+                  Back
+                </Button>
+                <Button 
+                  onClick={() => setStage('executing')}
+                  disabled={!allChecked}
+                  className="flex-1 h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                >
+                  <Zap className="w-5 h-5 mr-2" />
+                  Execute Payroll
+                </Button>
+              </div>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Confirm Payroll Execution</h2>
-            <p className="text-sm sm:text-base text-red-400 font-semibold">This action cannot be undone</p>
           </div>
-
-          {/* Checklist */}
-          <div className="space-y-4 mb-8">
-            <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/30 cursor-pointer transition-all bg-slate-700/30">
-              <input 
-                type="checkbox" 
-                checked={checked.verify}
-                onChange={(e) => setChecked({ ...checked, verify: e.target.checked })}
-                className="w-5 h-5 mt-0.5 accent-cyan-600"
-              />
-              <span className="text-white font-medium">I have verified all employee details</span>
-            </label>
-
-            <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/30 cursor-pointer transition-all bg-slate-700/30">
-              <input 
-                type="checkbox"
-                checked={checked.irreversible}
-                onChange={(e) => setChecked({ ...checked, irreversible: e.target.checked })}
-                className="w-5 h-5 mt-0.5 accent-cyan-600"
-              />
-              <span className="text-white font-medium">I understand this transaction is irreversible</span>
-            </label>
-
-            <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/30 cursor-pointer transition-all bg-slate-700/30">
-              <input 
-                type="checkbox"
-                checked={checked.amounts}
-                onChange={(e) => setChecked({ ...checked, amounts: e.target.checked })}
-                className="w-5 h-5 mt-0.5 accent-cyan-600"
-              />
-              <span className="text-white font-medium">I confirm the payment amounts are correct</span>
-            </label>
-          </div>
-
-          {/* Final Amount */}
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-2 border-cyan-500/30 mb-8">
-            <div className="text-center">
-              <div className="text-sm text-slate-400 mb-2">You are about to transfer:</div>
-              <div className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mb-2">${totalSalaryUSD}</div>
-              <div className="text-slate-300 mb-1">{fmt(totalSalaryIDRX)} IDRX</div>
-              <div className="text-sm text-slate-500">To {employeeCount} employees</div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <Button 
-              onClick={() => setStage('review')}
-              variant="outline"
-              className="flex-1 h-12 sm:h-14 rounded-xl border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
-            >
-              Back
-            </Button>
-            <Button 
-              onClick={() => setStage('executing')}
-              disabled={!allChecked}
-              className="flex-1 h-12 sm:h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-            >
-              <Zap className="w-5 h-5 mr-2" />
-              Execute Payroll
-            </Button>
-          </div>
-        </div>
+        </main>
       </div>
     );
   }
 
-  // Executing and Success states omitted for brevity but should be kept generic or updated similarily
-  // For this rewrite, I will keep the original executing/success UI but just ensure they don't break.
-  // ... (Code cut for brevity, I will include the full executing/success blocks in valid TSX below)
-  
   if (stage === 'executing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 flex items-center justify-center p-8 relative overflow-hidden">
-        {/* Animated particles */}
-        <div className="absolute inset-0">
-          {[...Array(20)].map((_, i) => (
-            <div key={i} className="absolute w-2 h-2 bg-cyan-400 rounded-full animate-pulse opacity-30" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 2}s` }}></div>
-          ))}
-        </div>
-
-        <div className="relative z-10 max-w-4xl w-full">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mt-6">Executing Payroll...</h2>
-            <p className="text-white/70 mt-2">Please wait, do not close this page</p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 space-y-4 border border-white/10">
-              {[
-                { label: 'Preparing transaction', step: 1 },
-                { label: 'Calculating amounts', step: 2 },
-                { label: 'Sending to blockchain', step: 3 },
-                { label: 'Distributing to employees', step: 4 },
-                { label: 'Sending notifications', step: 5 }
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3">
-                   {currentStep > item.step ? <CheckCircle className="w-6 h-6 text-emerald-400" /> : <div className="w-6 h-6 rounded-full border-2 border-white/30"></div>}
-                   <span className="text-white font-medium">{item.label}</span>
+      <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+        <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <main className="flex-1 overflow-y-auto">
+          <CompanyHeader 
+            title="Executing Payroll"
+            subtitle="Processing blockchain transaction"
+          />
+          
+          <div className="max-w-2xl mx-auto p-4 lg:p-8">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/10">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/50 animate-pulse">
+                  <Zap className="w-10 h-10 text-white" />
                 </div>
-              ))}
+                <h2 className="text-3xl font-bold text-white mb-2">Executing Payroll...</h2>
+                <p className="text-slate-400">Please wait, do not close this page</p>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="space-y-4">
+                {[
+                  { label: 'Preparing transaction', step: 1 },
+                  { label: 'Calculating amounts', step: 2 },
+                  { label: 'Sending to blockchain', step: 3 },
+                  { label: 'Distributing to employees', step: 4 },
+                  { label: 'Sending notifications', step: 5 }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-slate-700/30 border border-white/10">
+                    {currentStep > item.step ? (
+                      <CheckCircle className="w-6 h-6 text-emerald-400" />
+                    ) : currentStep === item.step ? (
+                      <div className="w-6 h-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin"></div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full border-2 border-white/30"></div>
+                    )}
+                    <span className={`font-medium ${currentStep >= item.step ? 'text-white' : 'text-slate-500'}`}>
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     );
   }
 
+  // Success stage
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 flex items-center justify-center p-8">
-      <div className="max-w-4xl w-full">
-        <div className="text-center mb-12">
-          <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50">
-            <CheckCircle className="w-20 h-20 text-white" />
+    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+      <Sidebar currentPage="payroll-execution" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      <main className="flex-1 overflow-y-auto">
+        <CompanyHeader 
+          title="Payroll Complete"
+          subtitle="Transaction successful"
+        />
+        
+        <div className="max-w-2xl mx-auto p-4 lg:p-8">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/10">
+            <div className="text-center mb-8">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50">
+                <CheckCircle className="w-14 h-14 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold text-white mb-3">Payroll Executed Successfully!</h1>
+              <p className="text-xl text-slate-400">{employeeCount} employees have received their payment</p>
+            </div>
+
+            {/* Summary */}
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-500/20 border-2 border-emerald-500/30 mb-8">
+              <div className="text-center">
+                <div className="text-sm text-slate-400 mb-2">Total Transferred:</div>
+                <div className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent mb-1">${totalSalaryUSD}</div>
+                <div className="text-slate-300">{fmt(totalSalaryIDRX)} IDRX</div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-4">
+              <Button 
+                onClick={() => onNavigate('dashboard')} 
+                className="flex-1 h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl"
+              >
+                Back to Dashboard
+              </Button>
+              <Button 
+                onClick={() => onNavigate('transactions')} 
+                variant="outline"
+                className="flex-1 h-14 rounded-xl border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
+              >
+                View Transactions
+              </Button>
+            </div>
           </div>
-          <h1 className="text-5xl font-bold text-white mb-3">Payroll Executed Successfully!</h1>
-          <p className="text-xl text-white/80 mb-2">{employeeCount} employees have received their payment</p>
         </div>
-        <div className="flex flex-wrap gap-4 justify-center">
-          <Button variant="ghost" onClick={() => onNavigate('dashboard')} className="h-12 px-8 text-white hover:bg-white/10 rounded-xl">
-            Back to Dashboard
-          </Button>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

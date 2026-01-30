@@ -401,7 +401,7 @@ export function HRDashboard({ onNavigate }: HRDashboardProps) {
 
                   <div className="flex justify-end">
                     <Button 
-                      onClick={() => onNavigate('payroll-confirmation')}
+                      onClick={() => onNavigate('payroll-execution')}
                       disabled={(stats?.employees?.total ?? 0) === 0}
                       className="bg-[#1E40AF] hover:bg-[#1e3a8a] text-white px-12 py-6 text-base rounded-md disabled:opacity-50"
                     >
