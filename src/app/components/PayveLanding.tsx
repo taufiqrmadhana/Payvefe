@@ -1,4 +1,4 @@
-import { ArrowRight, Play, Zap, Clock, TrendingDown, Shield, ChevronRight, LogIn, Menu, X } from 'lucide-react';
+import { ArrowRight, Play, Zap, Clock, TrendingDown, Shield, ChevronRight, LogIn, Menu, X, Layers, KeyRound, Coins, FileCheck } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { useState, useEffect, useRef } from 'react';
 import createGlobe from "cobe";
@@ -628,85 +628,124 @@ export function PayveLanding({ onNavigate }: PayveLandingProps) {
         data-scroll-section
         className="py-16 sm:py-24 bg-slate-900 border-t border-b border-white/5 relative overflow-hidden"
       >
-        {/* Atmospheric light source for the section */}
+        {/* Subtle gradient overlays */}
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-cyan-500/5 blur-[100px] rounded-full pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-8 relative z-10">
-          <div className={`text-center mb-12 sm:mb-20 transition-all duration-1000 ${
+          {/* Section Header */}
+          <div className={`text-center mb-12 sm:mb-16 transition-all duration-1000 ${
             visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
-              Next-Gen <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent">Infrastructure</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700/50 mb-6">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-sm text-slate-300 font-medium">Enterprise-Grade Technology</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
+              Built for Scale
             </h2>
-            <p className="text-slate-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
-              Built on the most secure protocols to ensure your global payroll is settled with absolute precision.
+            <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+              Powered by battle-tested blockchain infrastructure trusted by leading organizations worldwide.
             </p>
           </div>
 
-          {/* Adjusted Bento Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 sm:gap-5">
-            {[
-              { 
-                name: 'Base L2', 
-                desc: 'Ethereum-level security with lightning speeds. Gas fees <$0.01, making micro-payouts viable for any team size.', 
-                gradient: 'from-blue-600 to-cyan-500',
-                span: 'md:col-span-3',
-                icon: '⚡'
-              },
-              { 
-                name: 'OnchainKit', 
-                desc: 'Seamless onboarding via Account Abstraction. No seed phrases, just secure email-based access.', 
-                gradient: 'from-indigo-600 to-purple-500',
-                span: 'md:col-span-3',
-                icon: '🔑'
-              },
-              { 
-                name: 'IDRX Stablecoin', 
-                desc: '1:1 Rupiah backed. Instant fiat settlement for your Indonesian workforce.', 
-                gradient: 'from-cyan-600 to-emerald-500',
-                span: 'md:col-span-2',
-                icon: '🪙'
-              },
-              { 
-                name: 'Smart Contracts', 
-                desc: 'Audited by OpenZeppelin. Open-source, trustless, and fully automated distribution logic.', 
-                gradient: 'from-emerald-600 to-green-500',
-                span: 'md:col-span-4',
-                icon: '🛡️'
-              }
-            ].map((tech, i) => (
-              <div 
-                key={i} 
-                className={`group relative p-8 rounded-[2rem] bg-slate-950/40 backdrop-blur-md border border-white/5 hover:border-cyan-500/30 transition-all duration-500 cursor-default ${tech.span} ${
-                  visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-                }`}
-                style={{ 
-                  transitionDelay: `${i * 100 + 200}ms`,
-                  transition: 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              >
-                {/* Internal Glow Effect on Hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]" />
-                
-                <div className="relative z-10">
-                  {/* Icon Container */}
-                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tech.gradient} flex items-center justify-center text-xl mb-6 shadow-xl shadow-black/40 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500`}>
-                    <span className="filter drop-shadow-sm">{tech.icon}</span>
+          {/* Technology Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            {/* Base L2 Card */}
+            <div 
+              className={`group relative p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 hover:border-blue-500/50 transition-all duration-500 ${
+                visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+              style={{ transitionDelay: '200ms' }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
+                  <Layers className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-white">Base L2</h3>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full">Ethereum</span>
                   </div>
-                  
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-cyan-400 transition-colors duration-300">
-                    {tech.name}
-                  </h3>
-                  
-                  <p className="text-slate-400 text-sm sm:text-base leading-relaxed group-hover:text-slate-300 transition-colors">
-                    {tech.desc}
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Ethereum-level security with sub-second finality. Transaction fees under $0.01 enable cost-effective micro-payouts at any scale.
                   </p>
                 </div>
-
-                {/* Bottom-right accent glow */}
-                <div className={`absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-br ${tech.gradient} opacity-0 group-hover:opacity-10 blur-[40px] transition-opacity duration-500`} />
               </div>
-            ))}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            </div>
+
+            {/* OnchainKit Card */}
+            <div 
+              className={`group relative p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 hover:border-violet-500/50 transition-all duration-500 ${
+                visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+              style={{ transitionDelay: '300ms' }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow">
+                  <KeyRound className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-white">OnchainKit</h3>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-violet-500/20 text-violet-400 rounded-full">Coinbase</span>
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Account Abstraction for frictionless onboarding. Employees access wallets via email—no seed phrases or crypto knowledge required.
+                  </p>
+                </div>
+              </div>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            </div>
+
+            {/* IDRX Card */}
+            <div 
+              className={`group relative p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 hover:border-emerald-500/50 transition-all duration-500 ${
+                visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+              style={{ transitionDelay: '400ms' }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow">
+                  <Coins className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-white">IDRX Stablecoin</h3>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-full">1:1 IDR</span>
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Fully backed Indonesian Rupiah stablecoin. Instant settlement with zero conversion fees for your local workforce.
+                  </p>
+                </div>
+              </div>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            </div>
+
+            {/* Smart Contracts Card */}
+            <div 
+              className={`group relative p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 hover:border-cyan-500/50 transition-all duration-500 ${
+                visibleSections.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+              style={{ transitionDelay: '500ms' }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow">
+                  <FileCheck className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-white">Audited Contracts</h3>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-cyan-500/20 text-cyan-400 rounded-full">OpenZeppelin</span>
+                  </div>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Open-source smart contracts audited by industry leaders. Trustless, automated payroll distribution with full transparency.
+                  </p>
+                </div>
+              </div>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            </div>
           </div>
         </div>
       </section>
@@ -715,11 +754,20 @@ export function PayveLanding({ onNavigate }: PayveLandingProps) {
       <footer className="py-8 sm:py-12 bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4 group cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/50 transition-all duration-300 group-hover:scale-110">
-                <Zap className="w-5 h-5 text-white" />
+            <div 
+              className="flex items-center justify-center gap-2 sm:gap-3 mb-4 group cursor-pointer"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            >
+              <div className="relative w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center transition-all duration-300">
+                <img 
+                  src="/src/public/Payve-Logo.png" 
+                  alt="Payve Logo" 
+                  className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+                />
               </div>
-              <div className="text-xl sm:text-2xl font-bold text-white group-hover:text-cyan-400 transition-colors duration-300">Payve</div>
+              <span className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                Payve
+              </span>
             </div>
             <p className="text-slate-400 text-xs sm:text-sm mb-6">
               Payve-ing the way for cross-border crypto payroll
