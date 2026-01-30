@@ -20,6 +20,7 @@ import { ErrorStates } from '@/app/components/ErrorStates';
 import { Reports } from '@/app/components/Reports';
 import { Notifications } from '@/app/components/Notifications';
 import { HelpSupport } from '@/app/components/HelpSupport';
+import { InvitePage } from '@/app/components/InvitePage';
 
 // Payve Premium Components (Now the default)
 import { PayveLanding } from '@/app/components/PayveLanding';
@@ -51,6 +52,7 @@ type Page =
   | 'reports'
   | 'notifications-full'
   | 'help-support'
+  | 'invite'
   | 'error-404';
 
 type ErrorType = 'insufficient-balance' | 'transaction-failed' | 'network-mismatch' | '404' | null;
@@ -80,11 +82,18 @@ const PROTECTED_PAGES: Page[] = [
 export default function App() {
   const { isConnected } = useAccount();
 
-  // Initialize state from localStorage
-  const [currentPage, setCurrentPage] = useState<Page>(() => {
+  // Check URL for invite page
+  const getInitialPage = (): Page => {
+    const url = new URL(window.location.href);
+    if (url.pathname === '/invite' || url.searchParams.has('token')) {
+      return 'invite';
+    }
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_PAGE);
     return (saved as Page) || 'landing';
-  });
+  };
+
+  // Initialize state from localStorage
+  const [currentPage, setCurrentPage] = useState<Page>(getInitialPage);
 
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -180,6 +189,8 @@ export default function App() {
         return <Notifications onNavigate={handleNavigate} />;
       case 'help-support':
         return <HelpSupport onNavigate={handleNavigate} />;
+      case 'invite':
+        return <InvitePage onNavigate={handleNavigate} />;
       default:
         return <PayveLanding onNavigate={handleNavigate} />;
     }

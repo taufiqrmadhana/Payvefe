@@ -5,7 +5,9 @@ import { Label } from '@/app/components/ui/label';
 import { useState } from 'react';
 import { Flag } from '@/app/components/ui/flag';
 import { usePayve } from '@/hooks/usePayve';
+import { useAccount } from 'wagmi';
 import { keccak256, toBytes, toHex } from 'viem';
+import { API_BASE_URL } from '@/constants';
 
 interface PayveAddEmployeeProps {
   onClose: () => void;
@@ -24,7 +26,8 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
   const [inviteSecret, setInviteSecret] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { createInvite } = usePayve();
+  const { createInvite, companyContractAddress } = usePayve();
+  const { address } = useAccount();
 
   const handleCreateInvite = async () => {
     try {
@@ -45,12 +48,34 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
       // Salary must be in wei (18 decimals) if using IDRX standard, but let's assume input is whole IDRX for now
       // Actually standard ERC20 usually 18 decimals. 
       // mocking 1 IDR = 1 unit? or 1 IDRX = 1e18?
-      // Let's assume input salaryIDRX is "human readable" and we need to multiply by 1e18?
-      // Wait, MockIDRX might just be 18 decimals.
-      // Let's treat input as FULL tokens (e.g. 6,880,000 IDRX).
+      // Let's assume input as FULL tokens (e.g. 6,880,000 IDRX).
       const salaryBigInt = BigInt(salaryIDRX.replace(/,/g, '')) * BigInt(1e18);
 
       await createInvite(inviteHash, name || "New Employee", salaryBigInt);
+
+      // 4. Send email invite through backend (if email provided)
+      if (email && email.includes('@')) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/employees/invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              name: name || 'New Employee',
+              secret: secret,
+              company_contract_address: companyContractAddress,
+              admin_wallet: address,
+              monthly_salary_usd: Math.round(parseInt(salaryIDRX.replace(/,/g, '')) / 16000).toString()
+            })
+          });
+          const result = await response.json();
+          if (result.success) {
+            console.log('Invite email sent successfully');
+          }
+        } catch (emailError) {
+          console.warn('Failed to send invite email, but on-chain invite created:', emailError);
+        }
+      }
 
       setSuccess(true);
     } catch (error) {
@@ -72,8 +97,20 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
           <h2 className="text-2xl font-bold text-white mb-2">Employee Invited!</h2>
           <p className="text-slate-400 mb-6">Transaction confirmed on Base Sepolia.</p>
           
+          {email && email.includes('@') && (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-2 text-emerald-400 mb-1">
+                <Mail className="w-4 h-4" />
+                <span className="font-semibold text-sm">Email Invite Sent!</span>
+              </div>
+              <p className="text-slate-400 text-sm">
+                Invite link sent to <span className="text-white">{email}</span>
+              </p>
+            </div>
+          )}
+          
           <div className="bg-slate-900/50 p-4 rounded-xl border border-dashed border-cyan-500/50 mb-6">
-            <div className="text-xs uppercase text-cyan-400 font-bold mb-2">Invite Code (Secret)</div>
+            <div className="text-xs uppercase text-cyan-400 font-bold mb-2">Invite Code (Backup)</div>
             <div className="flex items-center gap-2 bg-slate-950 rounded-lg p-3 border border-white/10">
                 <code className="flex-1 text-lg font-mono text-white tracking-widest text-center">
                     {inviteSecret}
@@ -83,7 +120,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                 </Button>
             </div>
             <p className="text-xs text-slate-500 mt-2">
-                Share this code with the employee. They need it to claim their profile.
+                {email ? 'Backup code if email fails. Employee can also use this to claim manually.' : 'Share this code with the employee. They need it to claim their profile.'}
             </p>
           </div>
 
