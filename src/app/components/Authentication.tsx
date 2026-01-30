@@ -1,4 +1,6 @@
-import { ArrowLeft, Zap } from 'lucide-react';
+'use client';
+
+import { ArrowLeft, Briefcase, User, ShieldCheck, ChevronRight, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { usePayve } from '@/hooks/usePayve';
@@ -17,159 +19,173 @@ interface AuthenticationProps {
 
 export function Authentication({ onNavigate }: AuthenticationProps) {
   const [accountType, setAccountType] = useState<'company' | 'employee'>('company');
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const { address, isConnected } = useAccount();
   const { myCompanyAddress } = usePayve();
 
   useEffect(() => {
+    // Memastikan redirect hanya terjadi jika wallet benar-benar terhubung
     if (isConnected && address) {
-      // Logic: If user has a company contract, they are a Company Owner.
-      // Otherwise, assume they are an Employee (or new user).
+      setIsRedirecting(true);
+
       const timer = setTimeout(() => {
-        if (myCompanyAddress) {
-           console.log("Found company address, redirecting to Dashboard");
-           onNavigate('dashboard');
+        if (accountType === 'company') {
+          // Validasi: Jika memilih Company tapi tidak punya kontrak perusahaan, 
+          // arahkan ke onboarding atau tetap di dashboard sesuai App logic
+          if (myCompanyAddress) {
+            onNavigate('dashboard');
+          } else {
+            // Jika ingin memaksa ke dashboard untuk dev:
+            onNavigate('company-dashboard'); 
+          }
         } else {
-           console.log("No company address found, redirecting to Employee Dashboard");
-           onNavigate('employee-dashboard');
+          // Navigasi khusus untuk portal Employee
+          onNavigate('employee-dashboard');
         }
-      }, 2000); // Wait a bit for myCompanyAddress to load
+      }, 1500);
+
       return () => clearTimeout(timer);
+    } else {
+      // Jika terputus, pastikan loading state berhenti
+      setIsRedirecting(false);
     }
-  }, [isConnected, address, myCompanyAddress, onNavigate]);
+  }, [isConnected, address, myCompanyAddress, onNavigate, accountType]); 
 
   return (
-    <div className="min-h-screen flex bg-slate-950">
-      {/* Left Side - Auth Form */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-12">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Zap className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-xl font-bold text-white">Payve</div>
-            </div>
-            <button 
-              onClick={() => onNavigate('landing')}
-              className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Home
-            </button>
-          </div>
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 relative overflow-hidden selection:bg-cyan-500/20">
+      {/* Background Ambient Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none" />
+
+      {/* Header Minimalis */}
+      <div className="absolute top-8 sm:top-12 left-0 right-0 px-8 sm:px-12 flex justify-between items-center w-full max-w-7xl mx-auto">
+        <div 
+          className="flex items-center gap-3 cursor-pointer group"
+          onClick={() => onNavigate('landing')}
+        >
+          <img 
+            src="/Payve-Logo.svg" 
+            alt="Payve Logo" 
+            className="w-8 h-8 opacity-90 transition-opacity group-hover:opacity-100" 
+          />
+          <span className="text-lg font-medium text-white tracking-tight">Payve</span>
         </div>
+        
+        {!isRedirecting && (
+          <button 
+            onClick={() => onNavigate('landing')}
+            className="text-xs font-medium text-slate-500 hover:text-white transition-colors flex items-center gap-2 group"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+            Landing
+          </button>
+        )}
+      </div>
 
-        <div className="flex-1 flex items-center justify-center px-8 pb-16">
-          <div className="w-full max-w-md">
-            <h1 className="text-3xl font-bold text-white mb-2">Connect to Payve</h1>
-            <p className="text-slate-400 mb-8">Access your {accountType} dashboard</p>
+      {/* Konten Utama */}
+      <div className="w-full max-w-[400px] relative z-10">
+        {isRedirecting ? (
+          /* Tampilan Elegan saat Proses Redirect */
+          <div className="flex flex-col items-center justify-center space-y-6 animate-in fade-in zoom-in duration-500 text-center">
+            <div className="relative">
+              <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center border border-blue-500/20">
+                <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+              </div>
+              <div className="absolute -inset-4 bg-cyan-500/10 blur-2xl rounded-full -z-10 animate-pulse" />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-white tracking-tight">Verifying Identity</h2>
+              <p className="text-slate-500 text-sm">
+                Securely accessing your <span className="text-cyan-400 font-medium capitalize">{accountType}</span> portal...
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* Tampilan Form Login */
+          <div className="space-y-10 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl font-semibold text-white tracking-tight">Get Started</h1>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                Select your portal and connect wallet <br /> 
+                to access <span className="text-slate-300 font-medium">Payve</span>
+              </p>
+            </div>
 
-            {/* Account Type Tabs */}
-            <div className="flex gap-2 mb-8 bg-slate-800/50 p-1 rounded-xl border border-white/10">
+            {/* Switcher Tipe Akun */}
+            <div className="w-full flex p-1 bg-slate-900/40 backdrop-blur-md rounded-2xl border border-white/5 shadow-inner">
               <button
                 onClick={() => setAccountType('company')}
-                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-bold tracking-widest transition-all duration-300 ${
                   accountType === 'company'
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white/10 text-white border border-white/10 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-400'
                 }`}
               >
-                Company
+                <Briefcase className="w-3.5 h-3.5" />
+                COMPANY
               </button>
               <button
                 onClick={() => setAccountType('employee')}
-                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-bold tracking-widest transition-all duration-300 ${
                   accountType === 'employee'
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-white/10 text-white border border-white/10 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-400'
                 }`}
               >
-                Employee
+                <User className="w-3.5 h-3.5" />
+                EMPLOYEE
               </button>
             </div>
 
-            <div className="bg-slate-800/30 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-6">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Zap className="w-8 h-8 text-blue-400" />
-                </div>
-                <h3 className="text-white font-semibold text-lg mb-1">
-                  {isConnected ? 'Wallet Connected' : 'Connect Smart Wallet'}
-                </h3>
-                <p className="text-slate-400 text-sm">
-                  {isConnected 
-                    ? 'Redirecting you to the dashboard...' 
-                    : 'Log in with FaceID, TouchID, or Email'}
-                </p>
+            {/* Area Tombol Connect Wallet */}
+            <div className="w-full flex flex-col items-center space-y-8">
+              <div className="flex justify-center w-full">
+                <Wallet>
+                  <ConnectWallet 
+                    className="!bg-white !text-black hover:!bg-slate-200 !rounded-2xl !font-bold !transition-all !border-none px-8 h-14 shadow-[0_8px_30px_rgb(0,0,0,0.12)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-6 w-6" />
+                      <Name className="text-black" />
+                      {!isConnected && <span>Connect Wallet</span>}
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </ConnectWallet>
+                  
+                  <WalletDropdown className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden">
+                    <Identity className="px-4 pt-4 pb-2" hasCopyAddressOnClick>
+                      <Avatar />
+                      <Name className="text-white" />
+                      <Address className="text-slate-500" />
+                      <EthBalance className="text-cyan-400 font-bold" />
+                    </Identity>
+                    <div className="h-px bg-white/5 mx-4 my-2" />
+                    <WalletDropdownLink icon="wallet" href="https://keys.coinbase.com" className="text-slate-300 hover:bg-white/5">
+                      Settings
+                    </WalletDropdownLink>
+                    <WalletDropdownDisconnect className="text-red-400 hover:bg-red-500/10 font-semibold" />
+                  </WalletDropdown>
+                </Wallet>
               </div>
 
-              <Wallet>
-                <ConnectWallet className="w-full">
-                  <Avatar className="h-6 w-6" />
-                  <Name />
-                </ConnectWallet>
-                <WalletDropdown>
-                  <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                    <Avatar />
-                    <Name />
-                    <Address />
-                    <EthBalance />
-                  </Identity>
-                  <WalletDropdownLink icon="wallet" href="https://keys.coinbase.com">
-                    Wallet
-                  </WalletDropdownLink>
-                  <WalletDropdownDisconnect />
-                </WalletDropdown>
-              </Wallet>
-            </div>
-
-            {/* Footer Links */}
-            <div className="mt-12 text-center text-xs text-slate-500">
-              <span className="opacity-50">Powered by Coinbase OnchainKit</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Brand Showcase */}
-      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-900 text-white relative overflow-hidden">
-        {/* Animated Grid Overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.03]" 
-          style={{
-            backgroundImage: 'linear-gradient(rgba(59,130,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.5) 1px, transparent 1px)',
-            backgroundSize: '64px 64px'
-          }}
-        ></div>
-
-        {/* Floating Shapes */}
-        <div className="absolute top-20 left-20 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-
-        <div className="relative z-10 flex flex-col items-center justify-center p-16">
-          <div className="max-w-lg">
-            <blockquote className="text-3xl font-bold mb-6 leading-tight">
-              "We reduced payroll processing time from 2 hours to 2 minutes"
-            </blockquote>
-            <p className="text-cyan-200 mb-12 text-lg">
-              Sarah Chen, CFO at RemoteCo
-            </p>
-
-            <div className="grid grid-cols-3 gap-8 pt-8 border-t border-cyan-400/30">
-              <div>
-                <div className="text-3xl font-bold mb-1">$2.4M</div>
-                <div className="text-sm text-slate-300">Processed monthly</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold mb-1">1,200+</div>
-                <div className="text-sm text-slate-300">Employees paid</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold mb-1">99.9%</div>
-                <div className="text-sm text-slate-300">Uptime</div>
+              {/* Indikator Status */}
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-800" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+                  Onchain Verification Required
+                </span>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Footer Security */}
+        <div className="pt-12 flex items-center justify-center gap-6 opacity-30">
+          <ShieldCheck className="w-4 h-4 text-slate-400" />
+          <div className="w-px h-3 bg-slate-800" />
+          <span className="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase">
+            Base Layer 2 Secured
+          </span>
         </div>
       </div>
     </div>
