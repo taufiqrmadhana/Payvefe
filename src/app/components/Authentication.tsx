@@ -3,13 +3,12 @@
 import { ArrowLeft, Briefcase, User, ShieldCheck, ChevronRight, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { usePayve } from '@/hooks/usePayve';
-import { 
-  ConnectWallet, 
-  Wallet, 
-  WalletDropdown, 
-  WalletDropdownDisconnect, 
-  WalletDropdownLink 
+import {
+  ConnectWallet,
+  Wallet,
+  WalletDropdown,
+  WalletDropdownDisconnect,
+  WalletDropdownLink
 } from '@coinbase/onchainkit/wallet';
 import { Address, Avatar, Name, Identity, EthBalance } from '@coinbase/onchainkit/identity';
 
@@ -20,36 +19,35 @@ interface AuthenticationProps {
 export function Authentication({ onNavigate }: AuthenticationProps) {
   const [accountType, setAccountType] = useState<'company' | 'employee'>('company');
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
   const { address, isConnected } = useAccount();
-  const { myCompanyAddress } = usePayve();
 
   useEffect(() => {
     // Memastikan redirect hanya terjadi jika wallet benar-benar terhubung
     if (isConnected && address) {
       setIsRedirecting(true);
+      setIsChecking(true);
 
+      // Simple redirect logic - go directly to appropriate dashboard
       const timer = setTimeout(() => {
         if (accountType === 'company') {
-          // Validasi: Jika memilih Company tapi tidak punya kontrak perusahaan, 
-          // arahkan ke onboarding atau tetap di dashboard sesuai App logic
-          if (myCompanyAddress) {
-            onNavigate('dashboard');
-          } else {
-            // Jika ingin memaksa ke dashboard untuk dev:
-            onNavigate('company-dashboard'); 
-          }
+          // Always go to dashboard for company users
+          // Dashboard will show demo data if API fails
+          onNavigate('dashboard');
         } else {
-          // Navigasi khusus untuk portal Employee
+          // Employee portal
           onNavigate('employee-dashboard');
         }
+        setIsChecking(false);
       }, 1500);
 
       return () => clearTimeout(timer);
     } else {
       // Jika terputus, pastikan loading state berhenti
       setIsRedirecting(false);
+      setIsChecking(false);
     }
-  }, [isConnected, address, myCompanyAddress, onNavigate, accountType]); 
+  }, [isConnected, address, onNavigate, accountType]);
 
   return (
     <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 relative overflow-hidden selection:bg-cyan-500/20">
@@ -58,20 +56,20 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
 
       {/* Header Minimalis */}
       <div className="absolute top-8 sm:top-12 left-0 right-0 px-8 sm:px-12 flex justify-between items-center w-full max-w-7xl mx-auto">
-        <div 
+        <div
           className="flex items-center gap-3 cursor-pointer group"
           onClick={() => onNavigate('landing')}
         >
-          <img 
-            src="/Payve-Logo.svg" 
-            alt="Payve Logo" 
-            className="w-8 h-8 opacity-90 transition-opacity group-hover:opacity-100" 
+          <img
+            src="/Payve-Logo.svg"
+            alt="Payve Logo"
+            className="w-8 h-8 opacity-90 transition-opacity group-hover:opacity-100"
           />
           <span className="text-lg font-medium text-white tracking-tight">Payve</span>
         </div>
-        
+
         {!isRedirecting && (
-          <button 
+          <button
             onClick={() => onNavigate('landing')}
             className="text-xs font-medium text-slate-500 hover:text-white transition-colors flex items-center gap-2 group"
           >
@@ -92,9 +90,11 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
               </div>
               <div className="absolute -inset-4 bg-cyan-500/10 blur-2xl rounded-full -z-10 animate-pulse" />
             </div>
-            
+
             <div className="space-y-2">
-              <h2 className="text-xl font-semibold text-white tracking-tight">Verifying Identity</h2>
+              <h2 className="text-xl font-semibold text-white tracking-tight">
+                {isChecking ? 'Checking Account' : 'Verifying Identity'}
+              </h2>
               <p className="text-slate-500 text-sm">
                 Securely accessing your <span className="text-cyan-400 font-medium capitalize">{accountType}</span> portal...
               </p>
@@ -106,7 +106,7 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
             <div className="text-center space-y-2">
               <h1 className="text-2xl font-semibold text-white tracking-tight">Get Started</h1>
               <p className="text-slate-500 text-sm leading-relaxed">
-                Select your portal and connect wallet <br /> 
+                Select your portal and connect wallet <br />
                 to access <span className="text-slate-300 font-medium">Payve</span>
               </p>
             </div>
@@ -115,22 +115,20 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
             <div className="w-full flex p-1 bg-slate-900/40 backdrop-blur-md rounded-2xl border border-white/5 shadow-inner">
               <button
                 onClick={() => setAccountType('company')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-bold tracking-widest transition-all duration-300 ${
-                  accountType === 'company'
-                    ? 'bg-white/10 text-white border border-white/10 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-400'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-bold tracking-widest transition-all duration-300 ${accountType === 'company'
+                  ? 'bg-white/10 text-white border border-white/10 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-400'
+                  }`}
               >
                 <Briefcase className="w-3.5 h-3.5" />
                 COMPANY
               </button>
               <button
                 onClick={() => setAccountType('employee')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-bold tracking-widest transition-all duration-300 ${
-                  accountType === 'employee'
-                    ? 'bg-white/10 text-white border border-white/10 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-400'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-bold tracking-widest transition-all duration-300 ${accountType === 'employee'
+                  ? 'bg-white/10 text-white border border-white/10 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-400'
+                  }`}
               >
                 <User className="w-3.5 h-3.5" />
                 EMPLOYEE
@@ -141,7 +139,7 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
             <div className="w-full flex flex-col items-center space-y-8">
               <div className="flex justify-center w-full">
                 <Wallet>
-                  <ConnectWallet 
+                  <ConnectWallet
                     className="!bg-white !text-black hover:!bg-slate-200 !rounded-2xl !font-bold !transition-all !border-none px-8 h-14 shadow-[0_8px_30px_rgb(0,0,0,0.12)]"
                   >
                     <div className="flex items-center gap-3">
@@ -151,7 +149,7 @@ export function Authentication({ onNavigate }: AuthenticationProps) {
                       <ChevronRight className="w-4 h-4 text-slate-400" />
                     </div>
                   </ConnectWallet>
-                  
+
                   <WalletDropdown className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl mt-2 overflow-hidden">
                     <Identity className="px-4 pt-4 pb-2" hasCopyAddressOnClick>
                       <Avatar />

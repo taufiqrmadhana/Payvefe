@@ -330,6 +330,35 @@ The application is built with:
 
 All components are fully typed and use modern React patterns including hooks and functional components.
 
+## Testing the Employee Portal
+
+### Setup Requirements
+The Employee Dashboard requires configuration to display data:
+
+1. **Employer Contract Address**: The employee must have a valid employer contract address configured
+2. **Smart Contract Registration**: The employee's wallet must be registered in the employer's smart contract
+
+### How to Test
+
+#### As HR/Company (Create Employee):
+1. Connect wallet as HR
+2. Create company if not exists
+3. Create employee invite with `name`, `salary`, and `secret`
+4. Share the secret and company contract address with the employee
+
+#### As Employee (Claim Invite):
+1. Connect wallet as employee
+2. Click "Claim Job Invite" or go to Settings
+3. Enter the **Company Contract Address** (from HR)
+4. Enter the **Secret Code** (from HR)
+5. Submit to claim the invite
+
+### Why Dashboard Shows $0.00
+If the employee dashboard shows $0.00 balance/salary:
+- **No employer configured**: Set the employer contract address in Settings
+- **Not registered**: Claim the job invite first
+- **Wrong wallet**: Ensure you're connected with the correct wallet
+
 ## Browser Support
 
 - Chrome (latest)

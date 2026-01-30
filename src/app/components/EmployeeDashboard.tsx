@@ -1,4 +1,4 @@
-import { Wallet, Calendar, FileText, Bell, ArrowUpRight, ArrowDownLeft, Zap, TrendingUp, DollarSign, ExternalLink, Copy, Download, CheckCircle, Clock, Shield, LogOut, User, Settings as SettingsIcon, X } from 'lucide-react';
+import { Wallet, Calendar, FileText, Bell, ArrowUpRight, ArrowDownLeft, Zap, TrendingUp, DollarSign, ExternalLink, Copy, Download, CheckCircle, Clock, Shield, LogOut, User, Settings as SettingsIcon, X, Loader2 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
@@ -6,6 +6,9 @@ import { useState } from 'react';
 import { usePayve, usePayveData } from '@/hooks/usePayve';
 import { WithdrawModal } from '@/app/components/WithdrawModal';
 import { useAccount, useDisconnect } from 'wagmi';
+import { useEmployerConfig, useTransactions, useNotifications } from '@/hooks/useApi';
+import { DEFAULT_EXCHANGE_RATE } from '@/constants';
+import { transactionService } from '@/services';
 
 interface EmployeeDashboardProps {
   onNavigate: (page: string) => void;
@@ -14,17 +17,30 @@ interface EmployeeDashboardProps {
 export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
   const { claimInvite } = usePayve();
   const { disconnect } = useDisconnect();
+  const { address } = useAccount();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeModal, setActiveModal] = useState<'payslip' | 'contract' | 'schedule' | 'claim' | 'settings' | null>(null);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
   
   // Employee Feature State
   const [inviteSecret, setInviteSecret] = useState('');
-  // In a real app, this should be persisted or fetched from a registry
-  const [targetCompanyAddress, setTargetCompanyAddress] = useState(''); 
   
-  // Fetch Employee Data
-  const { employee } = usePayveData(targetCompanyAddress);
+  // Persistent employer address configuration
+  const { employerAddress, setEmployerAddress, isConfigured } = useEmployerConfig();
+  
+  // Fetch Employee Data from Smart Contract
+  const { employee } = usePayveData(employerAddress || undefined);
+  
+  // Fetch transaction history from backend
+  const { 
+    transactions: apiTransactions, 
+    loading: txLoading,
+    refresh: refreshTransactions 
+  } = useTransactions(address, false);
+  
+  // Fetch notifications
+  const { unreadCount } = useNotifications(address);
 
   // Logout handler
   const handleLogout = () => {
@@ -34,34 +50,71 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
 
   // Formatting helpers
   const formatIDRX = (val: bigint | undefined) => val ? (Number(val) / 1e18).toLocaleString() : '0';
-  const formatUSD = (val: bigint | undefined) => val ? (Number(val) / 1e18 / 16000).toFixed(2) : '0.00'; // Mock exchange rate
-
-  const transactions = [
-    { date: 'Jan 25', type: 'receive', title: 'Salary Payment', amount: '+ $430.00', time: '14:32 UTC', hash: '0xabc123def456', status: 'success', idrx: '6,880,000 IDRX' },
-    { date: 'Jan 20', type: 'send', title: 'Bank Withdrawal', amount: '- $215.00', time: '09:15 UTC', hash: '0xdef789ghi012', status: 'success', idrx: '3,440,000 IDRX' },
-    { date: 'Jan 15', type: 'receive', title: 'Bonus Payment', amount: '+ $100.00', time: '16:20 UTC', hash: '0xghi345jkl678', status: 'success', idrx: '1,600,000 IDRX' },
-    { date: 'Jan 10', type: 'send', title: 'Bank Withdrawal', amount: '- $150.00', time: '10:45 UTC', hash: '0xjkl901mno234', status: 'success', idrx: '2,400,000 IDRX' }
-  ];
+  const formatUSD = (val: bigint | undefined) => val ? (Number(val) / 1e18 / DEFAULT_EXCHANGE_RATE).toFixed(2) : '0.00';
+  
+  // Transform API transactions to display format
+  const transactions = apiTransactions.map(tx => {
+    const isReceive = ['distribute', 'claim_invite'].includes(tx.tx_type);
+    const amountUsd = (tx.amount_wei / 1e18 / DEFAULT_EXCHANGE_RATE).toFixed(2);
+    const amountIdrx = (tx.amount_wei / 1e18).toLocaleString();
+    const date = new Date(tx.created_at);
+    
+    return {
+      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      type: isReceive ? 'receive' : 'send',
+      title: tx.tx_type === 'distribute' ? 'Salary Payment' 
+           : tx.tx_type === 'withdraw' ? 'Bank Withdrawal'
+           : tx.tx_type === 'claim_invite' ? 'Job Claimed'
+           : tx.tx_type,
+      amount: `${isReceive ? '+' : '-'} $${amountUsd}`,
+      time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }),
+      hash: tx.tx_hash,
+      status: tx.status,
+      idrx: `${amountIdrx} IDRX`,
+    };
+  });
 
   const handleClaimInvite = async () => {
-    if (!inviteSecret || !targetCompanyAddress) {
+    if (!inviteSecret || !employerAddress) {
         alert("Please enter Secret AND Company Address");
         return;
     }
+    setClaimLoading(true);
     try {
-        await claimInvite(targetCompanyAddress, inviteSecret);
-        alert("Invite claimed successfully!");
+        const txHash = await claimInvite(employerAddress, inviteSecret);
+        
+        // Record transaction to backend
+        if (address && txHash) {
+            try {
+                await transactionService.create({
+                    wallet_address: address,
+                    tx_hash: txHash,
+                    tx_type: 'claim_invite',
+                    amount_wei: 0,
+                    status: 'success',
+                    metadata: { company_contract: employerAddress },
+                });
+                refreshTransactions();
+            } catch (e) {
+                console.error("Failed to record tx:", e);
+            }
+        }
+        
+        alert("Invite claimed successfully! Your wallet is now linked to your employer.");
         setInviteSecret('');
         setActiveModal(null);
     } catch (e) {
         console.error("Claim failed:", e);
-        alert("Failed to claim invite. Check console.");
+        alert("Failed to claim invite. Check console for details.");
+    } finally {
+        setClaimLoading(false);
     }
   };
 
   const handleWithdrawOpen = () => {
-      if (!targetCompanyAddress) {
+      if (!employerAddress) {
           alert("Please link your Employer Contract Address in Settings first");
+          setActiveModal('settings');
           return;
       }
       setIsWithdrawOpen(true);
@@ -94,7 +147,11 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
               {/* Notifications */}
               <button className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center hover:bg-slate-700/50 transition-all">
                 <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-[10px] sm:text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">2</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full text-[10px] sm:text-xs text-white font-bold flex items-center justify-center border-2 border-slate-900">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
               
               {/* Avatar with Dropdown */}
@@ -273,6 +330,11 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                 </button>
               </div>
               
+              {txLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                </div>
+              ) : (
               <div className="space-y-2">
                 {transactions.map((tx, i) => (
                   <div 
@@ -307,12 +369,22 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                           <p className="text-slate-500 truncate">{tx.idrx}</p>
                         </div>
                         <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-1.5 hover:bg-slate-600/50 rounded-lg transition-all">
+                          <button 
+                            onClick={() => navigator.clipboard.writeText(tx.hash)}
+                            className="p-1.5 hover:bg-slate-600/50 rounded-lg transition-all"
+                            title="Copy hash"
+                          >
                             <Copy className="w-4 h-4 text-slate-400" />
                           </button>
-                          <button className="p-1.5 hover:bg-slate-600/50 rounded-lg transition-all">
+                          <a 
+                            href={`https://basescan.org/tx/${tx.hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 hover:bg-slate-600/50 rounded-lg transition-all"
+                            title="View on explorer"
+                          >
                             <ExternalLink className="w-4 h-4 text-slate-400" />
-                          </button>
+                          </a>
                         </div>
                       </div>
                       <div className="mt-1 hidden sm:block">
@@ -322,8 +394,9 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                   </div>
                 ))}
               </div>
+              )}
 
-              {transactions.length === 0 && (
+              {!txLoading && transactions.length === 0 && (
                 <div className="text-center py-16">
                   <TrendingUp className="w-20 h-20 mx-auto mb-4 text-slate-700" />
                   <p className="text-slate-400 text-lg font-medium">No transactions yet</p>
@@ -450,43 +523,39 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Employee Name</span>
-                    <span className="text-white font-semibold">Alex Smith</span>
+                    <span className="text-white font-semibold">{employee?.name || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Employee ID</span>
-                    <span className="text-white font-mono">EMP-0042</span>
+                    <span className="text-slate-400">Wallet Address</span>
+                    <span className="text-white font-mono text-sm">{address ? `${address.slice(0,6)}...${address.slice(-4)}` : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Department</span>
-                    <span className="text-white font-semibold">Engineering</span>
+                    <span className="text-slate-400">Status</span>
+                    <span className="text-emerald-400 font-semibold">{employee?.isActive ? 'Active' : 'Inactive'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Payment Date</span>
-                    <span className="text-white font-semibold">Jan 25, 2026</span>
+                    <span className="text-white font-semibold">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                   </div>
                   
                   <div className="h-px bg-gradient-to-r from-blue-500/30 to-cyan-500/30 my-4"></div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Gross Salary</span>
-                    <span className="text-white font-semibold">$500.00</span>
+                    <span className="text-slate-400">Monthly Salary (Gross)</span>
+                    <span className="text-white font-semibold">${formatUSD(employee?.salary)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Tax Deduction</span>
-                    <span className="text-red-400 font-semibold">- $50.00</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Platform Fee</span>
-                    <span className="text-slate-400 font-semibold">- $2.50</span>
+                    <span className="text-slate-400">Salary in IDRX</span>
+                    <span className="text-white font-semibold">{formatIDRX(employee?.salary)} IDRX</span>
                   </div>
                   
                   <div className="h-px bg-gradient-to-r from-blue-500/30 to-cyan-500/30 my-4"></div>
                   
                   <div className="flex justify-between items-center">
-                    <span className="text-white font-bold text-lg">Net Salary</span>
+                    <span className="text-white font-bold text-lg">Current Balance</span>
                     <div className="text-right">
-                      <p className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">$430.00</p>
-                      <p className="text-sm text-slate-400">6,880,000 IDRX</p>
+                      <p className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">${formatUSD(employee?.balance)}</p>
+                      <p className="text-sm text-slate-400">{formatIDRX(employee?.balance)} IDRX</p>
                     </div>
                   </div>
                 </div>
@@ -541,20 +610,16 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                         <span className="text-white">Full-time Employment</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Start Date</span>
-                        <span className="text-white">Jan 1, 2024</span>
+                        <span className="text-slate-400">Status</span>
+                        <span className={employee?.isActive ? "text-emerald-400" : "text-red-400"}>{employee?.isActive ? 'Active' : 'Inactive'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">End Date</span>
-                        <span className="text-white">Dec 31, 2026</span>
+                        <span className="text-slate-400">Employee Name</span>
+                        <span className="text-white">{employee?.name || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Position</span>
-                        <span className="text-white">Senior Developer</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Department</span>
-                        <span className="text-white">Engineering</span>
+                        <span className="text-slate-400">Wallet Address</span>
+                        <span className="text-white font-mono text-xs">{address ? `${address.slice(0,8)}...${address.slice(-6)}` : 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -566,7 +631,11 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-slate-400">Monthly Salary</span>
-                        <span className="text-white font-semibold">$500.00</span>
+                        <span className="text-white font-semibold">${formatUSD(employee?.salary)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Salary in IDRX</span>
+                        <span className="text-white font-semibold">{formatIDRX(employee?.salary)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">Payment Currency</span>
@@ -582,13 +651,13 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                   <div className="h-px bg-white/10"></div>
 
                   <div>
-                    <h3 className="text-white font-bold mb-2">Benefits</h3>
-                    <ul className="space-y-1 text-sm text-slate-300">
-                      <li>✓ Health Insurance</li>
-                      <li>✓ Paid Time Off (20 days/year)</li>
-                      <li>✓ Remote Work Allowance</li>
-                      <li>✓ Professional Development Budget</li>
-                    </ul>
+                    <h3 className="text-white font-bold mb-2">Employer Contract</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Contract Address</span>
+                        <span className="text-white font-mono text-xs">{employerAddress ? `${employerAddress.slice(0,8)}...${employerAddress.slice(-6)}` : 'Not linked'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -634,12 +703,24 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
 
               <div className="bg-slate-700/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-6">
                 <div className="space-y-4">
-                  {[
-                    { month: 'February 2026', date: 'Feb 25, 2026', amount: '$430.00', status: 'upcoming', days: '18 days' },
-                    { month: 'March 2026', date: 'Mar 25, 2026', amount: '$430.00', status: 'scheduled', days: '46 days' },
-                    { month: 'April 2026', date: 'Apr 25, 2026', amount: '$430.00', status: 'scheduled', days: '77 days' },
-                    { month: 'May 2026', date: 'May 25, 2026', amount: '$430.00', status: 'scheduled', days: '107 days' }
-                  ].map((payment, i) => (
+                  {(() => {
+                    const salaryUsd = formatUSD(employee?.salary);
+                    const today = new Date();
+                    const schedules = [];
+                    for (let i = 0; i < 4; i++) {
+                      const payDate = new Date(today.getFullYear(), today.getMonth() + i, 25);
+                      if (payDate <= today) payDate.setMonth(payDate.getMonth() + 1);
+                      const daysUntil = Math.ceil((payDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      schedules.push({
+                        month: payDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                        date: payDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                        amount: `$${salaryUsd}`,
+                        status: i === 0 ? 'upcoming' : 'scheduled',
+                        days: `${daysUntil} days`
+                      });
+                    }
+                    return schedules;
+                  })().map((payment, i) => (
                     <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 border border-white/10">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                         payment.status === 'upcoming' 
@@ -688,8 +769,8 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                    <Label className="text-white mb-2 block">Company Contract Address</Label>
                    <Input 
                       placeholder="0x..." 
-                      value={targetCompanyAddress}
-                      onChange={(e) => setTargetCompanyAddress(e.target.value)}
+                      value={employerAddress}
+                      onChange={(e) => setEmployerAddress(e.target.value)}
                       className="bg-slate-700/50 border-white/10 text-white mb-1"
                    />
                    <p className="text-xs text-slate-500">Ensure this matches your employer's contract.</p>
@@ -708,9 +789,15 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
 
                 <Button 
                     onClick={handleClaimInvite}
-                    className="w-full h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg mt-4"
+                    disabled={claimLoading}
+                    className="w-full h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold rounded-xl shadow-lg mt-4 disabled:opacity-50"
                 >
-                    Claim Invite
+                    {claimLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Claiming...
+                      </>
+                    ) : 'Claim Invite'}
                 </Button>
             </div>
           </div>
@@ -743,10 +830,15 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
                    </div>
                    <Input 
                       placeholder="0x..." 
-                      value={targetCompanyAddress}
-                      onChange={(e) => setTargetCompanyAddress(e.target.value)}
+                      value={employerAddress}
+                      onChange={(e) => setEmployerAddress(e.target.value)}
                       className="bg-slate-700/50 border-white/10 text-white font-mono"
                    />
+                   {isConfigured && (
+                     <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+                       <CheckCircle className="w-3 h-3" /> Address saved
+                     </p>
+                   )}
                 </div>
 
                 <Button 
@@ -762,7 +854,7 @@ export function EmployeeDashboard({ onNavigate }: EmployeeDashboardProps) {
 
       {/* Revisit existing modals or close them properly */}
       {isWithdrawOpen && (
-          <WithdrawModal onClose={() => setIsWithdrawOpen(false)} companyAddress={targetCompanyAddress} />
+          <WithdrawModal onClose={() => setIsWithdrawOpen(false)} companyAddress={employerAddress} />
       )}
     </div>
   );

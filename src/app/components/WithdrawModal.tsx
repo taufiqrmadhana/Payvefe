@@ -4,6 +4,9 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { useState } from 'react';
 import { usePayve, usePayveData } from '@/hooks/usePayve';
+import { useAccount } from 'wagmi';
+import { transactionService } from '@/services';
+import { DEFAULT_EXCHANGE_RATE } from '@/constants';
 
 interface WithdrawModalProps {
   onClose: () => void;
@@ -21,7 +24,7 @@ interface Employee {
 
 export function WithdrawModal({ onClose, companyAddress }: WithdrawModalProps) {
   const { withdraw } = usePayve();
-  // const { address } = useAccount(); // Unused
+  const { address } = useAccount();
   const { employee } = usePayveData(companyAddress);
   const employeeData = employee as unknown as Employee;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,7 +32,7 @@ export function WithdrawModal({ onClose, companyAddress }: WithdrawModalProps) {
   // Formatted balance
   // employee.balance is bigint wei
   const rawBalance = employeeData?.balance ? Number(employeeData.balance) / 1e18 : 0;
-  const balanceUSD = (rawBalance / 16000).toFixed(2); // Approx rate
+  const balanceUSD = (rawBalance / DEFAULT_EXCHANGE_RATE).toFixed(2);
   
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -122,7 +125,24 @@ export function WithdrawModal({ onClose, companyAddress }: WithdrawModalProps) {
                 }
                 try {
                    setIsSubmitting(true);
-                   await withdraw(companyAddress); // No args, withdraws all
+                   const txHash = await withdraw(companyAddress); // No args, withdraws all
+                   
+                   // Record transaction to backend
+                   if (address && txHash) {
+                     try {
+                       await transactionService.create({
+                         wallet_address: address,
+                         tx_hash: txHash,
+                         tx_type: 'withdraw',
+                         amount_wei: rawBalance * 1e18,
+                         status: 'success',
+                         metadata: { company_contract: companyAddress },
+                       });
+                     } catch (e) {
+                       console.error("Failed to record tx:", e);
+                     }
+                   }
+                   
                    alert("Withdrawal successful! Check your wallet.");
                    onClose();
                 } catch (e) {

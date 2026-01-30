@@ -5,6 +5,14 @@ import MockIDRXABI from '../abis/MockIDRX.json';
 import { PAYVE_FACTORY_ADDRESS, IDRX_ADDRESS } from '../constants';
 import { useCallback } from 'react';
 
+// Type for employee data returned from smart contract
+export interface EmployeeData {
+    name: string;
+    salary: bigint;
+    balance: bigint;
+    isActive: boolean;
+}
+
 export function usePayve() {
     const { writeContractAsync } = useWriteContract();
     const { address } = useAccount();
@@ -137,5 +145,14 @@ export function usePayveData(contractAddress: string | undefined) {
         }
     });
 
-    return { employee };
+    // Cast to proper type - smart contract returns tuple [name, salary, balance, isActive]
+    const typedEmployee = employee as [string, bigint, bigint, boolean] | undefined;
+    const employeeData: EmployeeData | undefined = typedEmployee ? {
+        name: typedEmployee[0],
+        salary: typedEmployee[1],
+        balance: typedEmployee[2],
+        isActive: typedEmployee[3],
+    } : undefined;
+
+    return { employee: employeeData };
 }

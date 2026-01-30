@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAccount } from 'wagmi';
 import { LandingPage } from '@/app/components/LandingPage';
 import { Authentication } from '@/app/components/Authentication';
 import { CompanyOnboarding } from '@/app/components/CompanyOnboarding';
@@ -28,14 +29,14 @@ import { PayveAddEmployee } from '@/app/components/PayveAddEmployee';
 import { PayvePayrollExecution } from '@/app/components/PayvePayrollExecution';
 import { PayrollHistory } from '@/app/components/PayrollHistory';
 
-type Page = 
-  | 'landing' 
+type Page =
+  | 'landing'
   | 'authentication'
   | 'company-onboarding'
   | 'employee-invitation-email'
   | 'employee-onboarding'
-  | 'dashboard' 
-  | 'employee-list' 
+  | 'dashboard'
+  | 'employee-list'
   | 'add-employee'
   | 'payroll-confirmation'
   | 'payroll-processing'
@@ -54,8 +55,37 @@ type Page =
 
 type ErrorType = 'insufficient-balance' | 'transaction-failed' | 'network-mismatch' | '404' | null;
 
+// LocalStorage keys
+const STORAGE_KEYS = {
+  CURRENT_PAGE: 'payve_current_page',
+  USER_TYPE: 'payve_user_type',
+} as const;
+
+// Pages that require authentication
+const PROTECTED_PAGES: Page[] = [
+  'dashboard',
+  'employee-list',
+  'payroll-confirmation',
+  'payroll-processing',
+  'payroll-success',
+  'payroll-execution',
+  'employee-dashboard',
+  'payroll-history',
+  'settings',
+  'reports',
+  'notifications-full',
+  'help-support',
+];
+
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('landing');
+  const { isConnected } = useAccount();
+
+  // Initialize state from localStorage
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_PAGE);
+    return (saved as Page) || 'landing';
+  });
+
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showTransactionDetail, setShowTransactionDetail] = useState(false);
@@ -63,14 +93,30 @@ export default function App() {
   const [errorType, setErrorType] = useState<ErrorType>(null);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Persist current page to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_PAGE, currentPage);
+  }, [currentPage]);
+
+  // Check if user should be redirected due to disconnection
+  useEffect(() => {
+    const savedPage = localStorage.getItem(STORAGE_KEYS.CURRENT_PAGE) as Page;
+
+    // If wallet disconnects and user was on protected page, redirect to landing
+    if (!isConnected && PROTECTED_PAGES.includes(savedPage)) {
+      setCurrentPage('landing');
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_PAGE);
+    }
+  }, [isConnected]);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -82,7 +128,7 @@ export default function App() {
     } else if (page === 'transaction-detail') {
       setShowTransactionDetail(true);
     } else if (page.startsWith('error-')) {
-      setCurrentPage('hr-dashboard');
+      setCurrentPage('hr-dashboard' as Page);
       setErrorType(page.replace('error-', '') as ErrorType);
     } else {
       setCurrentPage(page as Page);
@@ -142,11 +188,11 @@ export default function App() {
   return (
     <>
       {renderPage()}
-      
+
       {showAddEmployeeModal && (
         <AddEmployeeModal onClose={() => setShowAddEmployeeModal(false)} />
       )}
-      
+
       {showWithdrawModal && (
         <WithdrawModal onClose={() => setShowWithdrawModal(false)} />
       )}
@@ -156,9 +202,9 @@ export default function App() {
       )}
 
       {errorType && (
-        <ErrorStates 
-          errorType={errorType} 
-          onClose={() => setErrorType(null)} 
+        <ErrorStates
+          errorType={errorType}
+          onClose={() => setErrorType(null)}
           onNavigate={handleNavigate}
         />
       )}

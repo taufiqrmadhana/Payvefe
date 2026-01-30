@@ -1,5 +1,5 @@
 import { parseEther, encodeFunctionData } from 'viem';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
@@ -12,6 +12,7 @@ import PayveABI from '@/abis/Payve.json';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 import { PayveAddEmployee } from '@/app/components/PayveAddEmployee';
+import { useCompany } from '@/hooks/useApi';
 import { 
   Transaction, 
   TransactionButton, 
@@ -32,6 +33,9 @@ export function Settings({ onNavigate }: SettingsProps) {
   
   // Total Contract Balance (of my company)
   const { address } = useAccount();
+  
+  // Backend company data
+  const { company: backendCompany, exists: backendCompanyExists, loading: companyLoading } = useCompany(address);
   
   const { data: contractBalance, refetch: refetchBalance } = useReadContract({
     abi: MockIDRXABI.abi,
@@ -168,8 +172,13 @@ export function Settings({ onNavigate }: SettingsProps) {
           <div className="max-w-5xl mx-auto">
             {/* Main Company Content */}
             <div className="space-y-6">
-                  {/* Create Company Flow */}
-                  {!myCompanyAddress ? (
+                  {/* Loading State */}
+                  {companyLoading ? (
+                    <div className="p-8 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 text-center">
+                      <Loader2 className="w-12 h-12 text-cyan-400 mx-auto mb-4 animate-spin" />
+                      <p className="text-slate-400">Loading company data...</p>
+                    </div>
+                  ) : !backendCompanyExists && !myCompanyAddress ? (
                       <div className="p-8 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 text-center">
                           <Building2 className="w-16 h-16 text-cyan-400 mx-auto mb-4 opacity-80" />
                           <h2 className="text-2xl font-bold text-white mb-2">Create Your Organization</h2>
@@ -193,8 +202,10 @@ export function Settings({ onNavigate }: SettingsProps) {
                                     <Building2 className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h2 className="font-bold text-white">Company Information</h2>
-                                    <p className="text-sm text-slate-400">{myCompanyAddress}</p>
+                                    <h2 className="font-bold text-white">{backendCompany?.company_name || 'Company Information'}</h2>
+                                    <p className="text-sm text-slate-400">
+                                      {myCompanyAddress || backendCompany?.payroll_contract_address || `Payroll Day: ${backendCompany?.payroll_day || 25}`}
+                                    </p>
                                 </div>
                             </div>
                             <Button 

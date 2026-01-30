@@ -1,18 +1,68 @@
-import { Search, Filter, Download, Plus, Mail, MoreVertical, Calendar, DollarSign, MapPin, Clock, ChevronDown, CheckCircle, AlertCircle, XCircle, Zap } from 'lucide-react';
+import { Search, Filter, Download, Plus, Mail, MoreVertical, Calendar, DollarSign, MapPin, Clock, ChevronDown, CheckCircle, AlertCircle, XCircle, Zap, Loader2, FileDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Flag } from '@/app/components/ui/flag';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useAccount } from 'wagmi';
+import { companyService } from '@/services/companyService';
+import { employeeService } from '@/services/employeeService';
 
 interface PayveEmployeeListProps {
   onNavigate: (page: string) => void;
+}
+
+function calculateDaysRemaining(dateString: string | null): number {
+  if (!dateString) return 0;
+  const end = new Date(dateString);
+  const now = new Date();
+  const diffTime = end.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays; // Can be negative if expired
 }
 
 export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+
+  const { address } = useAccount();
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchEmployees() {
+      if (address) {
+        try {
+          const res = await companyService.getEmployees(address);
+          if (res.success && Array.isArray(res.data)) {
+            const mapped = res.data.map((e: any) => ({
+              id: e.id,
+              name: e.full_name,
+              email: e.email,
+              role: e.position,
+              department: e.department,
+              status: e.status === 'active' ? 'Active' : (e.status === 'invited' ? 'Invited' : e.status),
+              salary: parseFloat(e.monthly_salary_usd || '0'),
+              contract: e.contract_end_date ? new Date(e.contract_end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No Contract',
+              days: calculateDaysRemaining(e.contract_end_date),
+              location: e.location || 'Unknown',
+              hiredDate: e.hired_at ? new Date(e.hired_at) : null
+            }));
+            setEmployees(mapped);
+          }
+        } catch (e) {
+          console.error("Failed to fetch employees", e);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    }
+    fetchEmployees();
+  }, [address]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -24,25 +74,118 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
   }, []);
 
   const toggleEmployee = (id: string) => {
-    setSelectedEmployees(prev => 
+    setSelectedEmployees(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
   const toggleAll = () => {
-    if (selectedEmployees.length === mockEmployees.length) {
+    if (selectedEmployees.length === employees.length) {
       setSelectedEmployees([]);
     } else {
-      setSelectedEmployees(mockEmployees.map(e => e.id));
+      setSelectedEmployees(employees.map(e => e.id));
     }
   };
+
+  // Execute Payroll for selected employees
+  const handleExecutePayroll = useCallback(() => {
+    if (selectedEmployees.length === 0) return;
+    
+    // Store selected employee IDs in session storage for payroll confirmation page
+    const selectedData = employees.filter(e => selectedEmployees.includes(e.id));
+    sessionStorage.setItem('selectedEmployeesForPayroll', JSON.stringify(selectedData));
+    
+    onNavigate('payroll-confirmation');
+  }, [selectedEmployees, employees, onNavigate]);
+
+  // Export selected employees to CSV
+  const handleExport = useCallback(() => {
+    const selectedData = selectedEmployees.length > 0 
+      ? employees.filter(e => selectedEmployees.includes(e.id))
+      : employees;
+    
+    // Create CSV content
+    const headers = ['Name', 'Email', 'Department', 'Position', 'Salary (USD)', 'Location', 'Status', 'Contract End'];
+    const rows = selectedData.map(emp => [
+      emp.name,
+      emp.email,
+      emp.department,
+      emp.role,
+      emp.salary.toFixed(2),
+      emp.location,
+      emp.status,
+      emp.contract
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `employees_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [selectedEmployees, employees]);
+
+  // Update contracts (extend by 1 year)
+  const [isUpdatingContracts, setIsUpdatingContracts] = useState(false);
+  
+  const handleUpdateContracts = useCallback(async () => {
+    if (selectedEmployees.length === 0 || !address) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to extend contracts for ${selectedEmployees.length} employee(s) by 1 year?`
+    );
+    
+    if (!confirmed) return;
+    
+    setIsUpdatingContracts(true);
+    
+    try {
+      const updatePromises = selectedEmployees.map(async (empId) => {
+        const employee = employees.find(e => e.id === empId);
+        if (!employee) return;
+        
+        // Calculate new contract end date (1 year from current end or from today)
+        const currentEnd = employee.contract !== 'No Contract' 
+          ? new Date(employee.contract).getTime() 
+          : Date.now();
+        const newEndDate = new Date(Math.max(currentEnd, Date.now()) + 365 * 24 * 60 * 60 * 1000);
+        
+        await employeeService.update(empId, {
+          admin_wallet_address: address,
+          contract_end_date: newEndDate.toISOString().split('T')[0]
+        });
+      });
+      
+      await Promise.all(updatePromises);
+      
+      alert(`Successfully extended contracts for ${selectedEmployees.length} employee(s)`);
+      setSelectedEmployees([]);
+      
+      // Refresh employee list
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to update contracts:', err);
+      alert('Failed to update some contracts. Please try again.');
+    } finally {
+      setIsUpdatingContracts(false);
+    }
+  }, [selectedEmployees, employees, address]);
 
   return (
     <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
       <Sidebar currentPage="employee-list" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       <main className="flex-1 overflow-y-auto">
-        <CompanyHeader 
+        <CompanyHeader
           title="Employees"
           subtitle="Manage your team and contracts"
           isMobileMenuOpen={isMobileMenuOpen}
@@ -51,7 +194,15 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
           onNavigate={onNavigate}
           showNotifications={true}
         >
-          <Button 
+          <Button
+            onClick={handleExport}
+            variant="outline"
+            className="h-10 sm:h-11 px-4 rounded-xl border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
+          >
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export All</span>
+          </Button>
+          <Button
             onClick={() => onNavigate('add-employee')}
             className="h-10 sm:h-11 px-4 sm:px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold text-sm sm:text-base"
           >
@@ -67,7 +218,7 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input 
+              <input
                 type="text"
                 placeholder="Search by name, email, wallet..."
                 className="w-full h-11 pl-12 pr-4 rounded-xl bg-slate-800/50 border border-white/10 focus:border-cyan-500/50 focus:outline-none transition-all text-white placeholder:text-slate-400"
@@ -92,34 +243,33 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
           {/* Tabs */}
           <div className="mb-6 overflow-x-auto">
             <div className="flex items-center gap-2 bg-slate-800/50 rounded-xl p-1 border border-white/10 inline-flex min-w-max sm:min-w-0">{/* Added wrapper div */}
-            {[
-              { id: 'all', label: 'All', count: 75 },
-              { id: 'active', label: 'Active', count: 68 },
-              { id: 'expiring', label: 'Expiring Soon', count: 7 },
-              { id: 'archived', label: 'Archived', count: 12 }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => onNavigate(tab.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tab.id === 'all'
+              {[
+                { id: 'all', label: 'All', count: employees.length },
+                { id: 'active', label: 'Active', count: employees.filter(e => e.status === 'Active').length },
+                { id: 'expiring', label: 'Expiring Soon', count: employees.filter(e => e.days < 30).length },
+                { id: 'archived', label: 'Archived', count: employees.filter(e => e.status === 'Inactive' || e.status === 'Archived').length }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id
                     ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-                }`}
-              >
-                {tab.label} ({tab.count})
-              </button>
-            ))}
+                    }`}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Average Salary', value: '$432' },
-              { label: 'Total Monthly Cost', value: '$32,400' },
-              { label: 'Newest', value: '5 this month' },
-              { label: 'Avg Contract', value: '8.2 months' }
+              { label: 'Average Salary', value: `$${(employees.reduce((acc, e) => acc + (e.salary || 0), 0) / (employees.length || 1)).toLocaleString('en-US', { maximumFractionDigits: 0 })}` },
+              { label: 'Total Monthly Cost', value: `$${employees.reduce((acc, e) => acc + (e.salary || 0), 0).toLocaleString()}` },
+              { label: 'Newest', value: `${employees.filter(e => e.hiredDate && (new Date().getTime() - e.hiredDate.getTime()) / (1000 * 3600 * 24) < 30).length} this month` },
+              { label: 'Avg Contract', value: `${((employees.reduce((acc, e) => acc + (e.days || 0), 0) / (employees.length || 1)) / 30).toFixed(1)} months` }
             ].map((stat, i) => (
               <div key={i} className="p-4 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-white/10 hover:border-cyan-500/30 transition-all">
                 <div className="text-sm text-slate-400 mb-1">{stat.label}</div>
@@ -136,8 +286,8 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
                 <thead className="bg-slate-900/50 border-b border-white/10">
                   <tr>
                     <th className="px-6 py-4 text-left">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="w-5 h-5 accent-cyan-600 rounded bg-slate-700 border-white/20"
                         onChange={toggleAll}
                       />
@@ -163,14 +313,29 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {mockEmployees.map((emp) => (
-                    <tr 
-                      key={emp.id} 
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+                          <p>Loading employees...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : employees.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                        No employees found. Add one to get started.
+                      </td>
+                    </tr>
+                  ) : employees.map((emp) => (
+                    <tr
+                      key={emp.id}
                       className="hover:bg-slate-700/30 transition-all group"
                     >
                       <td className="px-6 py-4">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={selectedEmployees.includes(emp.id)}
                           onChange={() => toggleEmployee(emp.id)}
                           className="w-5 h-5 accent-cyan-600 rounded bg-slate-700 border-white/20"
@@ -201,12 +366,11 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
                         <div className="text-xs text-slate-500">{emp.days} days</div>
                         {/* Progress bar */}
                         <div className="w-full h-1.5 bg-slate-700 rounded-full mt-2 overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${
-                              emp.status === 'Expiring Soon' 
-                                ? 'bg-gradient-to-r from-amber-500 to-orange-500' 
-                                : 'bg-gradient-to-r from-blue-500 to-cyan-500'
-                            }`}
+                          <div
+                            className={`h-full rounded-full ${emp.status === 'Expiring Soon'
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                              : 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                              }`}
                             style={{ width: `${(emp.days / 365) * 100}%` }}
                           ></div>
                         </div>
@@ -218,14 +382,12 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          emp.status === 'Active' 
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${
-                            emp.status === 'Active' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                          }`}></div>
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${emp.status === 'Active'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${emp.status === 'Active' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                            }`}></div>
                           {emp.status}
                         </span>
                       </td>
@@ -243,7 +405,7 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
             {/* Pagination */}
             <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between bg-slate-900/50">
               <div className="text-sm text-slate-400">
-                Showing 1-5 of 75 employees
+                Showing {employees.length > 0 ? 1 : 0}-{Math.min(5, employees.length)} of {employees.length} employees
               </div>
               <div className="flex items-center gap-2">
                 <button className="px-3 py-1.5 rounded-lg border border-white/10 text-sm text-slate-300 hover:bg-slate-700/50 transition-all">
@@ -274,16 +436,35 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-xl rounded-2xl px-8 py-4 shadow-2xl border border-cyan-500/30 flex items-center gap-6 z-50">
               <span className="text-white font-semibold">{selectedEmployees.length} employees selected</span>
               <div className="flex gap-3">
-                <Button className="h-10 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold">
+                <Button 
+                  onClick={handleExecutePayroll}
+                  className="h-10 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
                   Execute Payroll
                 </Button>
-                <Button variant="outline" className="h-10 px-6 rounded-xl border-white/20 text-white hover:bg-white/10">
+                <Button 
+                  onClick={handleExport}
+                  variant="outline" 
+                  className="h-10 px-6 rounded-xl border-white/20 text-white hover:bg-white/10"
+                >
+                  <FileDown className="w-4 h-4 mr-2" />
                   Export
                 </Button>
-                <Button variant="outline" className="h-10 px-6 rounded-xl border-white/20 text-white hover:bg-white/10">
+                <Button 
+                  onClick={handleUpdateContracts}
+                  disabled={isUpdatingContracts}
+                  variant="outline" 
+                  className="h-10 px-6 rounded-xl border-white/20 text-white hover:bg-white/10 disabled:opacity-50"
+                >
+                  {isUpdatingContracts ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
                   Update Contracts
                 </Button>
-                <button 
+                <button
                   onClick={() => setSelectedEmployees([])}
                   className="text-slate-400 hover:text-white px-3"
                 >
@@ -297,11 +478,3 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
     </div>
   );
 }
-
-const mockEmployees = [
-  { id: '1', name: 'Anderson Smith', email: 'anderson@company.com', salary: 432, contract: 'Dec 31, 2025', days: 240, location: 'indonesia', status: 'Active' },
-  { id: '2', name: 'Sarah Johnson', email: 'sarah@company.com', salary: 520, contract: 'Nov 15, 2025', days: 195, location: 'philippines', status: 'Active' },
-  { id: '3', name: 'Mike Chen', email: 'mike@company.com', salary: 380, contract: 'Feb 28, 2026', days: 15, location: 'vietnam', status: 'Expiring Soon' },
-  { id: '4', name: 'Emma Wilson', email: 'emma@company.com', salary: 450, contract: 'Jan 20, 2026', days: 280, location: 'thailand', status: 'Active' },
-  { id: '5', name: 'David Lee', email: 'david@company.com', salary: 490, contract: 'Mar 10, 2026', days: 320, location: 'malaysia', status: 'Active' },
-];
