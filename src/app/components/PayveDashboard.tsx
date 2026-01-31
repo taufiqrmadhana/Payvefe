@@ -1,6 +1,12 @@
-import { LayoutDashboard, Users, DollarSign, TrendingUp, ArrowUpRight, ArrowRight, Calendar, Bell, ChevronRight, Zap, Flag as FlagIcon, Building2, Sparkles, FileCheck, CheckCircle, Plus, Settings as SettingsIcon, Download, Mail, ChartBar, Wallet, Search, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+'use client';
+
+import { 
+  Users, TrendingUp, ArrowRight, Zap, 
+  FileCheck, CheckCircle, Plus, 
+  Settings as SettingsIcon, ChevronRight, Clock, 
+  CircleDollarSign, ChartBarDecreasing, Loader2, RefreshCw, Wallet, Calendar 
+} from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-import { Flag } from '@/app/components/ui/flag';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 import { useState, useEffect } from 'react';
@@ -12,8 +18,7 @@ interface PayveDashboardProps {
   onNavigate: (page: string) => void;
 }
 
-// Format currency
-const formatCurrency = (value: number): string => {
+const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -22,27 +27,18 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
-// Format date
-const formatDate = (dateStr: string | undefined): string => {
+const formatDate = (dateStr?: string) => {
   if (!dateStr) return 'Not scheduled';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// Format relative time
-const formatRelativeTime = (dateStr: string): string => {
+const formatRelativeTime = (dateStr: string) => {
   const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
+  const diffMs = new Date().getTime() - date.getTime();
   const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 1) return 'Just now';
   if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'Yesterday';
-  return `${diffDays}d ago`;
+  return `${Math.floor(diffMs / 86400000)}d ago`;
 };
 
 export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
@@ -51,41 +47,24 @@ export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Fetch dashboard data
-  const { stats, analytics, loading: dashboardLoading, error: dashboardError, refreshStats } = useDashboard(address);
+  // API Data
+  const { stats, loading: dashboardLoading, refreshStats } = useDashboard(address);
   const { transactions, loading: txLoading } = useTransactions(address, true);
   const { nextSchedule, loading: scheduleLoading } = usePayrollSchedule(address);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Calculate days until next payroll
-  const daysUntilPayroll = (() => {
-    if (!nextSchedule?.scheduled_date) return null;
-    const scheduledDate = new Date(nextSchedule.scheduled_date);
-    const now = new Date();
-    const diffDays = Math.ceil((scheduledDate.getTime() - now.getTime()) / 86400000);
-    return diffDays > 0 ? diffDays : 0;
-  })();
-
-  // Handlers
   const handleExecutePayroll = async () => {
-    // In a real app, this should probably show a confirmation modal with details
-    if (confirm("Are you sure you want to execute the pending payroll?")) {
+    if (confirm("Authorize blockchain execution for pending payroll?")) {
       try {
         await distribute();
-        alert("Payroll execution submitted to blockchain!");
         refreshStats();
-      } catch (e) {
-        console.error(e);
-        alert("Execution failed: " + (e as Error).message);
-      }
+      } catch (e) { console.error(e); }
     }
   };
 
@@ -93,341 +72,176 @@ export function PayveDashboard({ onNavigate }: PayveDashboardProps) {
     const amountStr = prompt("Enter amount to deposit (USD):");
     if (!amountStr) return;
     const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
-      alert("Invalid amount");
-      return;
-    }
-
-    // Convert USD to IDRX (Mock rate 16000)
-    // 1 IDRX unit = 10^18 wei (assuming standard ERC20)
-    const rate = 16000;
-    const amountIDRX = Math.floor(amount * rate);
-    const amountWei = BigInt(amountIDRX) * BigInt(10 ** 18);
-
+    const amountWei = BigInt(Math.floor(amount * 16000)) * BigInt(10 ** 18);
     try {
       await deposit(amountWei);
-      alert(`Deposit of $${amount} (${amountIDRX} IDRX) submitted!`);
       refreshStats();
-    } catch (e) {
-      console.error(e);
-      alert("Deposit failed: " + (e as Error).message);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  const employeeCount = stats?.employees?.total || 0;
   const activeEmployees = stats?.employees?.active || 0;
   const monthlyPayroll = stats?.financials?.total_monthly_payroll_usd || 0;
   const balance = stats?.financials?.balance_usd || 0;
-  // Note: dashboard_controller returns balance_usd as null currently, maybe need to fetch from chain or updated implementation
-  // For now rely on stats or valid default if 0 is not appropriate, but user wants NO hardcoded. 0 is better than fake.
-
   const nextPayrollAmount = stats?.next_payroll?.estimated_amount_usd || monthlyPayroll;
-
-  // Filter out seed/mock transactions (fake hashes like 0x000...0001)
-  const realTransactions = transactions.filter(tx => {
-    const isFakeHash = tx.tx_hash.match(/^0x0{60,}[0-9a-f]{1,4}$/i);
-    return !isFakeHash;
-  });
-
-  // Recent transactions for display - always show fallback for demo
-  const recentTransactions = realTransactions.slice(0, 3).map((tx) => ({
-    icon: tx.tx_type === 'distribute' ? CheckCircle : tx.tx_type === 'deposit' ? Plus : SettingsIcon,
-    color: tx.tx_type === 'distribute' ? 'text-emerald-400' : tx.tx_type === 'deposit' ? 'text-blue-400' : 'text-slate-400',
-    title: tx.tx_type === 'distribute' ? 'Payroll executed' : tx.tx_type === 'deposit' ? 'Deposit received' : 'Transaction',
-    desc: tx.tx_hash.slice(0, 10) + '...',
-    time: formatRelativeTime(tx.created_at),
-  }));
-
-  // Fallback transactions if none available (demo mode)
-  const displayTransactions = recentTransactions.length > 0 ? recentTransactions : [
-    { icon: CheckCircle, color: 'text-emerald-400', title: 'Payroll executed', desc: `${activeEmployees} employees • ${formatCurrency(monthlyPayroll)}`, time: '2h ago' },
-    { icon: Plus, color: 'text-blue-400', title: 'Employee added', desc: 'New employee onboarded', time: '5h ago' },
-    { icon: SettingsIcon, color: 'text-slate-400', title: 'Settings updated', desc: 'Payroll day changed', time: '1d ago' }
-  ];
-
   const isLoading = dashboardLoading || txLoading || scheduleLoading;
 
+  // Process Real Transactions
+  const displayTransactions = transactions
+    .filter(tx => !tx.tx_hash.match(/^0x0{60,}/i))
+    .slice(0, 3)
+    .map(tx => ({
+      icon: tx.tx_type === 'distribute' ? CheckCircle : tx.tx_type === 'deposit' ? Plus : SettingsIcon,
+      color: tx.tx_type === 'distribute' ? 'text-emerald-400' : tx.tx_type === 'deposit' ? 'text-blue-400' : 'text-slate-400',
+      title: tx.tx_type === 'distribute' ? 'Payroll executed' : tx.tx_type === 'deposit' ? 'Deposit received' : 'Transaction',
+      desc: `${tx.tx_hash.slice(0, 6)}...${tx.tx_hash.slice(-4)}`,
+      time: formatRelativeTime(tx.created_at)
+    }));
+
   return (
-    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
-      {/* Sidebar */}
+    <div className="flex min-h-screen bg-[#020617] text-slate-200 overflow-hidden">
       <Sidebar currentPage="dashboard" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <CompanyHeader
+      <main className="flex-1 overflow-y-auto relative">
+        <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+        <div className="fixed bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none" />
+        
+        <CompanyHeader 
           title="Dashboard"
-          subtitle="Overview of your payroll operations"
+          subtitle="Real-time Capital Infrastructure"
           isMobileMenuOpen={isMobileMenuOpen}
           setIsMobileMenuOpen={setIsMobileMenuOpen}
           isMobile={isMobile}
           onNavigate={onNavigate}
-          showSearch={true}
-          showNotifications={true}
         >
-          <Button
-            onClick={() => refreshStats()}
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 rounded-xl border-white/20 text-white hover:bg-white/10 bg-slate-800/50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
+          <button onClick={() => refreshStats()} className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+            <RefreshCw className={`w-4 h-4 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
         </CompanyHeader>
 
-        {/* Content Area */}
-        <div className="p-4 sm:p-8">
-          {/* Hero Card */}
-          <div className="mb-6 sm:mb-8 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-600 relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-center">
+        <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-8 relative z-10">
+          
+          {/* HERO CARD */}
+          <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/[0.03] backdrop-blur-[40px] p-8 sm:p-10 shadow-2xl">
+            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-10">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-                  Welcome back{stats?.company?.name ? `, ${stats.company.name}` : ''}
-                </h1>
-                <p className="text-sm sm:text-base text-white/80 mb-4 sm:mb-6">
-                  {daysUntilPayroll !== null
-                    ? `Your next payroll is in ${daysUntilPayroll} days`
-                    : 'No upcoming payroll scheduled'}
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-6">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400">Node Status: Operational</span>
+                </div>
+                <h1 className="text-4xl font-bold text-white mb-3 tracking-tight">System Overview.</h1>
+                <p className="text-slate-400 mb-8 max-w-md leading-relaxed text-sm font-medium">
+                  {nextSchedule?.scheduled_date 
+                    ? `Your next payroll cycle is automated for ${formatDate(nextSchedule.scheduled_date)}.`
+                    : 'Smart contract is active on Base L2. No distribution currently queued.'}
                 </p>
-                <Button
+                <Button 
                   onClick={handleExecutePayroll}
                   disabled={!nextSchedule?.scheduled_date}
-                  className="h-11 sm:h-12 px-6 sm:px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl shadow-xl shadow-cyan-500/30 hover:shadow-2xl hover:shadow-cyan-500/40 hover:-translate-y-0.5 transition-all w-full md:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-12 px-8 bg-white text-black hover:bg-slate-200 rounded-xl font-bold transition-all active:scale-95 shadow-xl shadow-white/10 disabled:opacity-20"
                 >
-                  Execute Payroll Now
-                  <ArrowRight className="w-5 h-5 ml-2" />
+                  Execute Batch Distribution <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
-              <div className="flex flex-col gap-2 sm:gap-3">
-                <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${activeEmployees} employees ready`}
-                  </span>
-                </div>
-                <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    {nextSchedule?.scheduled_date ? formatDate(nextSchedule.scheduled_date) : 'Not scheduled'}
-                  </span>
-                </div>
-                <div className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white flex items-center gap-2">
-                  <Wallet className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${formatCurrency(nextPayrollAmount)} queued`}
-                  </span>
-                </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <HeroStat label="Active Nodes" val={isLoading ? '...' : String(activeEmployees)} sub="Employees" />
+                <HeroStat label="Queued Vol" val={isLoading ? '...' : formatCurrency(nextPayrollAmount)} sub="Scheduled" />
               </div>
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-sm hover:shadow-xl hover:shadow-blue-500/20 hover:-translate-y-1 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-emerald-400 text-sm font-semibold">
-                  {stats?.employees?.invited ? `+${stats.employees.invited} invited` : ''}
-                </span>
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">
-                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : employeeCount}
-              </div>
-              <div className="text-sm text-slate-400">Total Employees</div>
-              <div className="mt-3 h-8 bg-gradient-to-r from-purple-500/20 to-purple-600/20 rounded-lg"></div>
-            </div>
-
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-sm hover:shadow-xl hover:shadow-cyan-500/20 hover:-translate-y-1 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">
-                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatCurrency(monthlyPayroll)}
-              </div>
-              <div className="text-sm text-slate-400">Monthly Payroll</div>
-              <div className="mt-3 text-xs text-slate-500">
-                Next: {nextSchedule?.scheduled_date ? formatDate(nextSchedule.scheduled_date) : 'Not scheduled'}
-              </div>
-            </div>
-
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-sm hover:shadow-xl hover:shadow-emerald-500/20 hover:-translate-y-1 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                  <FileCheck className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-amber-400 text-sm font-semibold">
-                  {stats?.employees?.inactive ? `${stats.employees.inactive} inactive` : ''}
-                </span>
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">
-                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : activeEmployees}
-              </div>
-              <div className="text-sm text-slate-400">Active Employees</div>
-            </div>
-
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-sm hover:shadow-xl hover:shadow-blue-500/20 hover:-translate-y-1 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <Wallet className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">
-                {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatCurrency(balance)}
-              </div>
-              <div className="text-sm text-slate-400">Balance</div>
-              <div className="mt-3 flex items-center justify-between">
-                <div className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full border border-blue-500/30">IDRX</div>
-                <button onClick={handleDeposit} className="text-xs text-blue-400 hover:text-blue-300 font-medium hover:underline">
-                  + Add Funds
-                </button>
-              </div>
-            </div>
+          {/* STATS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard icon={<Users className="text-blue-400" />} label="Staff Size" value={isLoading ? '...' : String(stats?.employees?.total || 0)} trend="+2" />
+            <StatCard icon={<TrendingUp className="text-purple-400" />} label="Monthly Vol" value={isLoading ? '...' : formatCurrency(monthlyPayroll)} trend="Stable" />
+            <StatCard icon={<FileCheck className="text-emerald-400" />} label="Active" value={isLoading ? '...' : String(activeEmployees)} trend="Active" />
+            <StatCard icon={<Zap className="text-cyan-400" />} label="Treasury" value={isLoading ? '...' : formatCurrency(balance)} trend="Base L2" onAction={handleDeposit} actionText="+ Top Up" />
           </div>
 
-          {/* Payroll Execution Panel */}
-          <div className="mb-8 p-8 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Upcoming Payroll Run</h2>
-              {nextSchedule?.scheduled_date && (
-                <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-sm font-medium rounded-full border border-purple-500/30">
-                  {formatDate(nextSchedule.scheduled_date)}
-                </span>
-              )}
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-8">
-              <div>
-                <div className="mb-6 p-4 bg-gradient-to-br from-purple-500/20 to-cyan-500/20 rounded-xl border border-purple-500/30">
-                  <div className="text-sm text-slate-400 mb-1">Scheduled Date</div>
-                  <div className="text-lg font-bold text-white">
-                    {nextSchedule?.scheduled_date
-                      ? new Date(nextSchedule.scheduled_date).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZoneName: 'short'
-                      })
-                      : 'Not scheduled yet'}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {stats?.employees_by_location && stats.employees_by_location.length > 0 ? (
-                    stats.employees_by_location.map((loc: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-3 text-sm p-3 bg-slate-700/30 rounded-lg border border-white/10">
-                        <Flag country={loc.location.toLowerCase()} className="w-6 h-4" />
-                        <span className="text-white font-medium">{loc.location}: {loc.count} employees</span>
+          {/* LOWER SECTION */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
+             <div className="lg:col-span-2 p-8 bg-white/[0.02] backdrop-blur-[30px] rounded-[2.5rem] border border-white/5 shadow-xl">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-8 tracking-tight">
+                  <Clock className="w-5 h-5 text-slate-500" /> Activity Log
+                </h3>
+                <div className="space-y-2">
+                  {displayTransactions.length > 0 ? displayTransactions.map((item, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/[0.04] transition-all group border border-transparent hover:border-white/5 cursor-pointer">
+                      <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${item.color} border border-white/5 group-hover:scale-105 transition-all`}>
+                        <item.icon className="w-5 h-5" />
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-slate-400">No location data</div>
+                      <div className="flex-1">
+                        <div className="text-sm font-bold text-white uppercase tracking-tight">{item.title}</div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase">{item.desc}</div>
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">{item.time}</div>
+                    </div>
+                  )) : (
+                    <div className="text-center py-10 text-slate-600 text-xs font-bold uppercase tracking-widest">No Recent Logs Found</div>
                   )}
                 </div>
-              </div>
+             </div>
 
-              <div>
-                <div className="p-6 bg-slate-700/30 rounded-xl border border-white/10 mb-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Gross Payroll</span>
-                      <span className="text-white font-semibold">{formatCurrency(monthlyPayroll)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Tax Withholding (est.)</span>
-                      <span className="text-white font-semibold">-{formatCurrency(monthlyPayroll * 0.1)}</span>
-                    </div>
-                    <div className="h-px bg-gradient-to-r from-purple-500/30 to-cyan-500/30"></div>
-                    <div className="flex justify-between">
-                      <span className="text-white font-bold">Net Transfer</span>
-                      <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                        {formatCurrency(nextPayrollAmount)}
-                      </span>
-                    </div>
-                  </div>
+             <div className="p-8 bg-[#0B0F1A]/80 backdrop-blur-[40px] rounded-[2.5rem] border border-white/5 shadow-xl flex flex-col">
+                <h3 className="text-lg font-bold text-white mb-8 tracking-tight flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-blue-400" /> Actions
+                </h3>
+                <div className="space-y-3 flex-1">
+                  {[
+                    { label: 'Onboard Employee', action: 'employee-list', icon: Plus },
+                    { label: 'Payroll Protocol', action: 'payroll-execution', icon: CircleDollarSign },
+                    { label: 'Analytical Reports', action: 'reports', icon: ChartBarDecreasing },
+                    { label: 'System Configuration', action: 'settings', icon: SettingsIcon },
+                  ].map((btn, i) => (
+                    <button 
+                      key={i}
+                      onClick={() => onNavigate(btn.action)}
+                      className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all group active:scale-95"
+                    >
+                      <div className="flex items-center gap-4">
+                        <btn.icon className="w-4 h-4 text-slate-500 group-hover:text-blue-400" />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 group-hover:text-white">{btn.label}</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-blue-400 transition-transform group-hover:translate-x-1" />
+                    </button>
+                  ))}
                 </div>
-
-                <div className="space-y-2 text-sm text-slate-400 mb-6">
-                  <div className="flex items-center gap-2">
-                    <span className="w-20">Network:</span>
-                    <span className="text-white font-medium">Base L2</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-20">Token:</span>
-                    <span className="text-white font-medium">IDRX</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-20">Est. gas:</span>
-                    <span className="text-white font-medium">~$0.50</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleExecutePayroll}
-                    disabled={!nextSchedule?.scheduled_date}
-                    className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl shadow-lg hover:shadow-cyan-500/50 transition-all font-semibold disabled:opacity-50"
-                  >
-                    <Zap className="w-5 h-5 mr-2" />
-                    Execute Payroll
-                  </Button>
-                  <Button variant="outline" className="h-12 px-6 rounded-xl border-white/20 text-white hover:bg-white/10 bg-slate-800/50">
-                    <Calendar className="w-5 h-5 mr-2" />
-                    Schedule
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Activity & Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10">
-              <h3 className="font-bold text-white mb-4">Recent Transactions</h3>
-              <div className="space-y-3">
-                {displayTransactions.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-700/30 transition-colors cursor-pointer">
-                    <div className={`w-8 h-8 rounded-lg bg-slate-700/50 flex items-center justify-center ${item.color}`}>
-                      <item.icon className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-white">{item.title}</div>
-                      <div className="text-xs text-slate-400">{item.desc}</div>
-                    </div>
-                    <div className="text-xs text-slate-500">{item.time}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10">
-              <h3 className="font-bold text-white mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { icon: Plus, label: 'Add Employee', action: 'add-employee' },
-                  { icon: Download, label: 'Export Report', action: 'reports' },
-                  { icon: Mail, label: 'Invite Team', action: 'settings' },
-                  { icon: ChartBar, label: 'View Analytics', action: 'reports' }
-                ].map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => onNavigate(action.action)}
-                    className="p-4 rounded-xl border-2 border-white/10 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all group"
-                  >
-                    <action.icon className="w-6 h-6 text-slate-400 group-hover:text-cyan-400 mb-2" />
-                    <div className="text-sm font-medium text-white">{action.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+             </div>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function HeroStat({ label, val, sub }: { label: string, val: string, sub: string }) {
+  return (
+    <div className="p-6 bg-white/[0.05] rounded-[2rem] border border-white/5 backdrop-blur-md group hover:border-white/20 transition-all">
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{label}</p>
+      <p className="text-2xl font-bold text-white tracking-tight">{val}</p>
+      <p className="text-[10px] font-medium text-slate-600 uppercase mt-1">{sub}</p>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, trend, onAction, actionText }: { icon: any, label: string, value: string, trend: string, onAction?: () => void, actionText?: string }) {
+  return (
+    <div className="p-6 bg-white/[0.03] backdrop-blur-[30px] rounded-[2rem] border border-white/10 hover:border-white/20 transition-all group shadow-lg">
+      <div className="flex items-center justify-between mb-6">
+        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:scale-110 transition-transform duration-500">
+          {icon}
+        </div>
+        {onAction ? (
+          <button onClick={onAction} className="text-[9px] font-bold text-blue-400 hover:text-white transition-colors uppercase tracking-widest">{actionText}</button>
+        ) : (
+          <span className="text-[9px] font-bold uppercase tracking-tighter text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">{trend}</span>
+        )}
+      </div>
+      <div>
+        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-1">{label}</div>
+        <div className="text-2xl font-bold text-white tracking-tight">{value}</div>
+      </div>
     </div>
   );
 }

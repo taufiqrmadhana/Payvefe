@@ -1,6 +1,10 @@
-import { Search, MessageCircle, Book, Mail, Phone, FileText, ExternalLink, ChevronRight, Zap, HelpCircle, AlertCircle, Shield, DollarSign } from 'lucide-react';
+'use client';
+
+import { 
+  MessageCircle, Book, Mail, FileText, ChevronRight, Zap, 
+  HelpCircle, AlertCircle, Shield, DollarSign, Clock, Search
+} from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
 import { Sidebar } from '@/app/components/Sidebar';
 import { CompanyHeader } from '@/app/components/CompanyHeader';
 import { useState, useEffect } from 'react';
@@ -10,206 +14,156 @@ interface HelpSupportProps {
 }
 
 export function HelpSupport({ onNavigate }: HelpSupportProps) {
-  const [activeTab, setActiveTab] = useState('faq');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const faqs = [
+    { q: "What is IDRX?", a: "IDRX is a stablecoin pegged 1:1 to Indonesian Rupiah, making it easy to pay employees without currency volatility." },
+    { q: "How long do withdrawals take?", a: "Bank withdrawals typically complete within 5-10 minutes during business hours via our off-ramp partners." },
+    { q: "What fees does Payve charge?", a: "We charge 0.5% per payroll execution. Individual employee withdrawals have a flat fee of $0.50." },
+    { q: "Is my money safe?", a: "Yes. Funds are held in non-custodial audited smart contracts on Base blockchain. Only you have authorization to distribute." },
+    { q: "Can I cancel a payroll execution?", a: "No, blockchain transactions are immutable. Always review the batch confirmation screen before signing." }
+  ];
+
   return (
-    <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
+    <div className="flex min-h-screen bg-[#020617] text-slate-200 overflow-hidden font-sans">
       <Sidebar currentPage="help-support" onNavigate={onNavigate} isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto relative">
+        {/* BACKGROUND AURAS */}
+        <div className="fixed top-[-10%] left-[20%] w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+        <div className="fixed bottom-[10%] right-[5%] w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none" />
+        
         <CompanyHeader 
-          title="Help & Support"
-          subtitle="Get assistance and find answers"
+          title="Support Center"
+          subtitle="Documentation & Technical Assistance"
           isMobileMenuOpen={isMobileMenuOpen}
           setIsMobileMenuOpen={setIsMobileMenuOpen}
           isMobile={isMobile}
           onNavigate={onNavigate}
-          showNotifications={true}
         />
 
-        {/* Content Area */}
-        <div className="p-4 sm:p-8">
-          {/* Quick Links Grid */}
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {/* Getting Started */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 p-6 hover:border-blue-500/30 transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4 shadow-lg">
-                <Book className="w-6 h-6 text-white" />
+        <div className="p-6 sm:p-10 relative z-10 max-w-7xl mx-auto space-y-8">
+          
+          {/* TOP QUICK LINKS GRID */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <SupportActionCard 
+              icon={<Book className="text-blue-400" />} 
+              title="Knowledge Base"
+              links={[
+                "Adding Your First Employee",
+                "Executing Batch Payroll",
+                "Setting Up Withdrawals"
+              ]}
+            />
+            <SupportActionCard 
+              icon={<AlertCircle className="text-amber-400" />} 
+              title="Troubleshooting"
+              links={[
+                "Transaction Failed Issues",
+                "Low Liquidity Warning",
+                "Onboarding Delays"
+              ]}
+            />
+            <div className="p-8 bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+              <div>
+                <div className="w-12 h-12 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/20">
+                  <MessageCircle className="w-6 h-6 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Live Assistance</h3>
+                <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-6">Response time: ~5 mins</p>
               </div>
-              <h3 className="font-bold text-white mb-4">Getting Started</h3>
-              <div className="space-y-2">
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Adding Your First Employee →
-                </a>
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Executing Your First Payroll →
-                </a>
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Setting Up Bank Withdrawals →
-                </a>
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Understanding IDRX →
-                </a>
-              </div>
-            </div>
-
-            {/* Common Issues */}
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 p-6 hover:border-amber-500/30 transition-all">
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mb-4 shadow-lg">
-                <AlertCircle className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="font-bold text-white mb-4">Common Issues</h3>
-              <div className="space-y-2">
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Transaction Failed →
-                </a>
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Low Balance Error →
-                </a>
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Withdrawal Delays →
-                </a>
-                <a href="#" className="block text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Missing Transactions →
-                </a>
-              </div>
-            </div>
-
-            {/* Contact Support */}
-            <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl border border-cyan-500/30 p-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 shadow-lg">
-                <MessageCircle className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="font-bold text-white mb-2">Contact Support</h3>
-              <p className="text-sm text-slate-300 mb-4">Can't find what you're looking for?</p>
-              <div className="space-y-2">
-                <Button className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-cyan-500/50">
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Live Chat
+              <div className="space-y-3">
+                <Button className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+                  Start Live Chat
                 </Button>
-                <Button variant="outline" className="w-full h-11 border-white/20 text-white hover:bg-white/10 rounded-xl">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email Us
+                <Button variant="outline" className="w-full h-12 bg-white/5 text-white border-white/10 hover:bg-white/10 rounded-xl font-bold text-xs uppercase tracking-widest transition-all">
+                  Send Email
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* FAQ Section */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/10 p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-500 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
+          {/* FAQ SECTION */}
+          <div className="bg-white/[0.02] backdrop-blur-[40px] rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden relative">
+            <div className="p-8 border-b border-white/5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center border border-white/10 text-blue-400">
+                <HelpCircle className="w-5 h-5" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Frequently Asked Questions</h2>
+              <h2 className="text-xl font-bold text-white tracking-tight uppercase">Frequently Asked Questions</h2>
             </div>
             
-            <div className="space-y-3">
-              <div 
-                className="bg-slate-700/30 rounded-xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all"
-              >
-                <button
-                  className="w-full flex items-center justify-between p-5 text-left"
+            <div className="p-8 space-y-3">
+              {faqs.map((faq, idx) => (
+                <div 
+                  key={idx} 
+                  className={`rounded-2xl border transition-all duration-300 ${
+                    expandedFaq === idx ? 'bg-white/[0.04] border-white/10 shadow-lg' : 'bg-white/[0.01] border-white/5 hover:border-white/10'
+                  }`}
                 >
-                  <span className="font-semibold text-white pr-4">What is IDRX?</span>
-                  <ChevronRight className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                </button>
-                <div className="px-5 pb-5 pt-0">
-                  <p className="text-slate-300 leading-relaxed">IDRX is a stablecoin pegged 1:1 to Indonesian Rupiah, making it easy to pay employees without currency volatility.</p>
+                  <button
+                    onClick={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
+                    className="w-full flex items-center justify-between p-5 text-left group"
+                  >
+                    <span className={`font-bold text-sm transition-colors ${expandedFaq === idx ? 'text-blue-400' : 'text-slate-300 group-hover:text-white'}`}>
+                      {faq.q}
+                    </span>
+                    <ChevronRight className={`w-4 h-4 text-slate-600 transition-transform duration-300 ${expandedFaq === idx ? 'rotate-90 text-blue-400' : ''}`} />
+                  </button>
+                  <div className={`overflow-hidden transition-all duration-300 ${expandedFaq === idx ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="px-5 pb-5 pt-0 text-sm text-slate-400 leading-relaxed font-medium">
+                      {faq.a}
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div 
-                className="bg-slate-700/30 rounded-xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all"
-              >
-                <button
-                  className="w-full flex items-center justify-between p-5 text-left"
-                >
-                  <span className="font-semibold text-white pr-4">How long do withdrawals take?</span>
-                  <ChevronRight className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                </button>
-                <div className="px-5 pb-5 pt-0">
-                  <p className="text-slate-300 leading-relaxed">Bank withdrawals typically complete within 5-10 minutes during business hours.</p>
-                </div>
-              </div>
-
-              <div 
-                className="bg-slate-700/30 rounded-xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all"
-              >
-                <button
-                  className="w-full flex items-center justify-between p-5 text-left"
-                >
-                  <span className="font-semibold text-white pr-4">What fees does Payve charge?</span>
-                  <ChevronRight className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                </button>
-                <div className="px-5 pb-5 pt-0">
-                  <p className="text-slate-300 leading-relaxed">We charge 0.5% per payroll execution. Employee withdrawals cost $0.50 each.</p>
-                </div>
-              </div>
-
-              <div 
-                className="bg-slate-700/30 rounded-xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all"
-              >
-                <button
-                  className="w-full flex items-center justify-between p-5 text-left"
-                >
-                  <span className="font-semibold text-white pr-4">Is my money safe?</span>
-                  <ChevronRight className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                </button>
-                <div className="px-5 pb-5 pt-0">
-                  <p className="text-slate-300 leading-relaxed">Yes. Funds are held in audited smart contracts on Base blockchain. We cannot access your funds.</p>
-                </div>
-              </div>
-
-              <div 
-                className="bg-slate-700/30 rounded-xl border border-white/10 overflow-hidden hover:border-cyan-500/30 transition-all"
-              >
-                <button
-                  className="w-full flex items-center justify-between p-5 text-left"
-                >
-                  <span className="font-semibold text-white pr-4">Can I cancel a payroll after execution?</span>
-                  <ChevronRight className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                </button>
-                <div className="px-5 pb-5 pt-0">
-                  <p className="text-slate-300 leading-relaxed">No, blockchain transactions are final. Always review the confirmation screen carefully before proceeding.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Info Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mt-8">
-            <div className="p-6 bg-blue-500/10 rounded-xl border border-blue-500/30">
-              <Zap className="w-8 h-8 text-blue-400 mb-3" />
-              <h4 className="font-bold text-white mb-2">Instant Payments</h4>
-              <p className="text-sm text-slate-400">All payroll executes instantly on Base L2 blockchain</p>
-            </div>
-
-            <div className="p-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
-              <Shield className="w-8 h-8 text-emerald-400 mb-3" />
-              <h4 className="font-bold text-white mb-2">Secure & Safe</h4>
-              <p className="text-sm text-slate-400">Your funds are protected by audited smart contracts</p>
-            </div>
-
-            <div className="p-6 bg-cyan-500/10 rounded-xl border border-cyan-500/30">
-              <DollarSign className="w-8 h-8 text-cyan-400 mb-3" />
-              <h4 className="font-bold text-white mb-2">Low Fees</h4>
-              <p className="text-sm text-slate-400">Only 0.5% per payroll execution, much lower than traditional</p>
+              ))}
             </div>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+// SUB-COMPONENTS
+function SupportActionCard({ icon, title, links }: { icon: any, title: string, links: string[] }) {
+  return (
+    <div className="p-8 bg-white/[0.03] backdrop-blur-[40px] rounded-[2.5rem] border border-white/10 shadow-2xl hover:border-white/20 transition-all group">
+      <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-6 border border-white/10 group-hover:scale-110 transition-transform duration-500 shadow-inner">
+        {icon}
+      </div>
+      <h3 className="text-xl font-bold text-white mb-6 uppercase tracking-tight">{title}</h3>
+      <div className="space-y-4">
+        {links.map((link, i) => (
+          <a key={i} href="#" className="flex items-center justify-between text-xs font-bold text-slate-500 hover:text-blue-400 uppercase tracking-widest transition-colors group/link">
+            {link}
+            <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InfoBar({ icon, title, desc, color }: { icon: any, title: string, desc: string, color: string }) {
+  return (
+    <div className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 ${color}`}>
+        {icon}
+      </div>
+      <div>
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h4>
+        <p className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">{desc}</p>
+      </div>
     </div>
   );
 }
