@@ -43,6 +43,7 @@ export interface EmployeeUpdateRequest {
     department?: string;
     status?: string;
     wallet_address?: string;
+    contract_end_date?: string;
 }
 
 export interface EmployeeProfile {

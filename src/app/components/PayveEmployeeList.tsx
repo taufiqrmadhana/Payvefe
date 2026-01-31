@@ -9,6 +9,8 @@ import { companyService } from '@/services/companyService';
 import { employeeService } from '@/services/employeeService';
 import { usePayve } from '@/hooks/usePayve';
 import { API_BASE_URL } from '@/constants';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface PayveEmployeeListProps {
   onNavigate: (page: string) => void;
@@ -102,40 +104,47 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
     onNavigate('payroll-execution');
   }, [selectedEmployees, employees, onNavigate]);
 
-  // Export selected employees to CSV
+  // Export selected employees to PDF
   const handleExport = useCallback(() => {
     const selectedData = selectedEmployees.length > 0
       ? employees.filter(e => selectedEmployees.includes(e.id))
       : employees;
 
-    // Create CSV content
-    const headers = ['Name', 'Email', 'Department', 'Position', 'Salary (USD)', 'Location', 'Status', 'Contract End'];
-    const rows = selectedData.map(emp => [
+    // Create PDF document
+    const doc = new jsPDF();
+
+    // Add header
+    doc.setFontSize(20);
+    doc.setTextColor(15, 43, 72);
+    doc.text('Employee Report', 14, 22);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
+    doc.text(`Total: ${selectedData.length} employees`, 14, 36);
+
+    // Create table data
+    const tableData = selectedData.map(emp => [
       emp.name,
-      emp.email,
-      emp.department,
-      emp.role,
-      emp.salary.toFixed(2),
-      emp.location,
-      emp.status,
-      emp.contract
+      emp.email || '-',
+      emp.department || '-',
+      emp.role || '-',
+      `$${emp.salary?.toLocaleString() || '0'}`,
+      emp.status || '-'
     ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+    // Add table
+    autoTable(doc, {
+      head: [['Name', 'Email', 'Department', 'Position', 'Salary', 'Status']],
+      body: tableData,
+      startY: 42,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [14, 165, 233], textColor: 255 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
 
-    // Download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `employees_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Save PDF
+    doc.save(`employees_${new Date().toISOString().split('T')[0]}.pdf`);
   }, [selectedEmployees, employees]);
 
   // Update contracts (extend by 1 year)
