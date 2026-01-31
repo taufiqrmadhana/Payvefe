@@ -18,7 +18,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
   const [step, setStep] = useState(1);
   const [success, setSuccess] = useState(false);
   const [walletOption, setWalletOption] = useState<'create' | 'existing'>('create');
-  
+
   // Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -26,13 +26,13 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
   const [inviteSecret, setInviteSecret] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { createInvite, companyContractAddress } = usePayve();
+  const { createInvite, myCompanyAddress } = usePayve();
   const { address } = useAccount();
 
   const handleCreateInvite = async () => {
     try {
       setIsSubmitting(true);
-      
+
       // 1. Generate Secret
       const secret = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
       setInviteSecret(secret);
@@ -41,7 +41,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
       // Note: In solidity we do: keccak256(abi.encodePacked(secret))
       // In viem/js: keccak256(toBytes(secret)) matches this for string
       const inviteHash = keccak256(toBytes(secret));
-      
+
       console.log("Creating invite:", { name, salary: salaryIDRX, secret, hash: inviteHash });
 
       // 3. Send Transaction
@@ -53,28 +53,26 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
 
       await createInvite(inviteHash, name || "New Employee", salaryBigInt);
 
-      // 4. Send email invite through backend (if email provided)
-      if (email && email.includes('@')) {
-        try {
-          const response = await fetch(`${API_BASE_URL}/api/employees/invite`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email,
-              name: name || 'New Employee',
-              secret: secret,
-              company_contract_address: companyContractAddress,
-              admin_wallet: address,
-              monthly_salary_usd: Math.round(parseInt(salaryIDRX.replace(/,/g, '')) / 16000).toString()
-            })
-          });
-          const result = await response.json();
-          if (result.success) {
-            console.log('Invite email sent successfully');
-          }
-        } catch (emailError) {
-          console.warn('Failed to send invite email, but on-chain invite created:', emailError);
+      // 4. Sync employee to backend (always, even without email)
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/employees/invite`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email || null,
+            name: name || 'New Employee',
+            secret: secret,
+            company_contract_address: myCompanyAddress,
+            admin_wallet: address,
+            monthly_salary_usd: Math.round(parseInt(salaryIDRX.replace(/,/g, '')) / 16000).toString()
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          console.log('Employee synced to backend', email ? '+ invite email sent' : '(no email)');
         }
+      } catch (backendError) {
+        console.warn('Failed to sync employee to backend, but on-chain invite created:', backendError);
       }
 
       setSuccess(true);
@@ -96,7 +94,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Employee Invited!</h2>
           <p className="text-slate-400 mb-6">Transaction confirmed on Base Sepolia.</p>
-          
+
           {email && email.includes('@') && (
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6">
               <div className="flex items-center gap-2 text-emerald-400 mb-1">
@@ -108,19 +106,19 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
               </p>
             </div>
           )}
-          
+
           <div className="bg-slate-900/50 p-4 rounded-xl border border-dashed border-cyan-500/50 mb-6">
             <div className="text-xs uppercase text-cyan-400 font-bold mb-2">Invite Code (Backup)</div>
             <div className="flex items-center gap-2 bg-slate-950 rounded-lg p-3 border border-white/10">
-                <code className="flex-1 text-lg font-mono text-white tracking-widest text-center">
-                    {inviteSecret}
-                </code>
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-white" onClick={() => navigator.clipboard.writeText(inviteSecret)}>
-                    <Copy className="w-4 h-4" />
-                </Button>
+              <code className="flex-1 text-lg font-mono text-white tracking-widest text-center">
+                {inviteSecret}
+              </code>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-white" onClick={() => navigator.clipboard.writeText(inviteSecret)}>
+                <Copy className="w-4 h-4" />
+              </Button>
             </div>
             <p className="text-xs text-slate-500 mt-2">
-                {email ? 'Backup code if email fails. Employee can also use this to claim manually.' : 'Share this code with the employee. They need it to claim their profile.'}
+              {email ? 'Backup code if email fails. Employee can also use this to claim manually.' : 'Share this code with the employee. They need it to claim their profile.'}
             </p>
           </div>
 
@@ -139,7 +137,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
       <div className="w-full max-w-3xl bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-cyan-500/30">
         {/* Header */}
         <div className="relative p-8 pb-6">
-          <button 
+          <button
             onClick={onClose}
             className="absolute top-6 right-6 w-10 h-10 rounded-full bg-slate-700/50 hover:bg-slate-700 flex items-center justify-center transition-all hover:rotate-90 border border-white/10"
           >
@@ -150,13 +148,12 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
           <div className="flex items-center justify-center gap-3 mb-8">
             {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex items-center">
-                <div className={`relative ${s <= step ? 'w-10 h-10' : 'w-8 h-8'} rounded-full transition-all duration-300 ${
-                  s < step 
-                    ? 'bg-gradient-to-br from-blue-600 to-cyan-600' 
-                    : s === step
+                <div className={`relative ${s <= step ? 'w-10 h-10' : 'w-8 h-8'} rounded-full transition-all duration-300 ${s < step
+                  ? 'bg-gradient-to-br from-blue-600 to-cyan-600'
+                  : s === step
                     ? 'bg-gradient-to-br from-blue-600 to-cyan-600 ring-4 ring-cyan-500/30'
                     : 'bg-slate-700 border border-white/10'
-                }`}>
+                  }`}>
                   {s < step && (
                     <CheckCircle className="absolute inset-0 m-auto w-5 h-5 text-white" />
                   )}
@@ -190,7 +187,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                   <Label className="text-xs uppercase text-slate-400 font-semibold mb-2 block">Full Name</Label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <Input 
+                    <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Anderson Smith"
@@ -205,7 +202,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                     <Label className="text-xs uppercase text-slate-400 font-semibold mb-2 block">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                      <Input 
+                      <Input
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="anderson@company.com"
@@ -219,7 +216,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                     <Label className="text-xs uppercase text-slate-400 font-semibold mb-2 block">Position</Label>
                     <div className="relative">
                       <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                      <Input 
+                      <Input
                         placeholder="e.g. Senior Engineer"
                         className="h-13 pl-12 rounded-xl border border-white/10 focus:border-cyan-500/50 bg-slate-700/50 text-white placeholder:text-slate-500 transition-all"
                       />
@@ -230,7 +227,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
               </div>
 
               <div className="flex justify-end pt-4">
-                <Button 
+                <Button
                   onClick={() => setStep(2)}
                   className="h-12 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl hover:shadow-xl hover:shadow-cyan-500/50 transition-all font-semibold"
                 >
@@ -258,7 +255,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                 <div>
                   <Label className="text-xs uppercase text-slate-400 font-semibold mb-2 block">Monthly Salary (IDRX)</Label>
                   <div className="relative">
-                    <Input 
+                    <Input
                       value={salaryIDRX}
                       onChange={(e) => setSalaryIDRX(e.target.value)}
                       placeholder="e.g. 5000"
@@ -269,7 +266,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
               </div>
 
               <div className="flex justify-between pt-4">
-                <Button 
+                <Button
                   onClick={() => setStep(1)}
                   variant="ghost"
                   className="h-12 px-8 rounded-xl text-white hover:bg-white/10"
@@ -277,7 +274,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                   <ArrowLeft className="w-5 h-5 mr-2" />
                   Back
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setStep(3)}
                   className="h-12 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl hover:shadow-xl hover:shadow-cyan-500/50 transition-all font-semibold"
                 >
@@ -291,18 +288,18 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
           {/* Step 3: Payment Setup */}
           {step === 3 && (
             <div className="space-y-6">
-               {/* ... Keep existing ... */}
-               <div>
+              {/* ... Keep existing ... */}
+              <div>
                 <h2 className="text-2xl font-bold text-white mb-2">
                   Payment Setup
                 </h2>
                 <p className="text-slate-400">Select how they will receive funds. (For now, we just create an invite)</p>
-               </div>
-               
-               {/* ... logic for now just goes next ... */}
+              </div>
+
+              {/* ... logic for now just goes next ... */}
 
               <div className="flex justify-between pt-4">
-                <Button 
+                <Button
                   onClick={() => setStep(2)}
                   variant="ghost"
                   className="h-12 px-8 rounded-xl text-white hover:bg-white/10"
@@ -310,7 +307,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                   <ArrowLeft className="w-5 h-5 mr-2" />
                   Back
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setStep(4)}
                   className="h-12 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl hover:shadow-xl hover:shadow-cyan-500/50 transition-all font-semibold"
                 >
@@ -333,18 +330,18 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="p-6 bg-slate-700/50 rounded-2xl border border-white/10">
-                   <h3 className="font-bold text-white mb-2">Employee</h3>
-                   <div className="text-slate-300">{name}</div>
-                   <div className="text-slate-400 text-sm">{email}</div>
+                  <h3 className="font-bold text-white mb-2">Employee</h3>
+                  <div className="text-slate-300">{name}</div>
+                  <div className="text-slate-400 text-sm">{email}</div>
                 </div>
                 <div className="p-6 bg-slate-700/50 rounded-2xl border border-white/10">
-                   <h3 className="font-bold text-white mb-2">Salary</h3>
-                   <div className="text-emerald-400 font-bold text-xl">{salaryIDRX} IDRX</div>
+                  <h3 className="font-bold text-white mb-2">Salary</h3>
+                  <div className="text-emerald-400 font-bold text-xl">{salaryIDRX} IDRX</div>
                 </div>
               </div>
 
               <div className="flex justify-between pt-4">
-                <Button 
+                <Button
                   onClick={() => setStep(3)}
                   variant="ghost"
                   className="h-12 px-8 rounded-xl text-white hover:bg-white/10"
@@ -353,21 +350,21 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                   <ArrowLeft className="w-5 h-5 mr-2" />
                   Back
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateInvite}
                   disabled={isSubmitting}
                   className="h-12 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl hover:shadow-xl hover:shadow-cyan-500/50 transition-all font-semibold disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Confirming...
-                      </>
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Confirming...
+                    </>
                   ) : (
-                      <>
-                        <Sparkles className="w-5 h-5 mr-2" />
-                        Create Invite On-Chain
-                      </>
+                    <>
+                      <Sparkles className="w-5 h-5 mr-2" />
+                      Create Invite On-Chain
+                    </>
                   )}
                 </Button>
               </div>

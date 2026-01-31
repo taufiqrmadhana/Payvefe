@@ -7,7 +7,7 @@ import { EmployeeInvitationEmail } from '@/app/components/EmployeeInvitationEmai
 import { EmployeeOnboarding } from '@/app/components/EmployeeOnboarding';
 import { HRDashboard } from '@/app/components/HRDashboard';
 import { EmployeeList } from '@/app/components/EmployeeList';
-import { AddEmployeeModal } from '@/app/components/AddEmployeeModal';
+
 import { PayrollConfirmation } from '@/app/components/PayrollConfirmation';
 import { PayrollProcessing } from '@/app/components/PayrollProcessing';
 import { PayrollSuccess } from '@/app/components/PayrollSuccess';
@@ -95,10 +95,9 @@ export default function App() {
   // Initialize state from localStorage
   const [currentPage, setCurrentPage] = useState<Page>(getInitialPage);
 
-  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showTransactionDetail, setShowTransactionDetail] = useState(false);
-  const [showPayveAddEmployee, setShowPayveAddEmployee] = useState(false);
   const [errorType, setErrorType] = useState<ErrorType>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -131,7 +130,7 @@ export default function App() {
 
   const handleNavigate = (page: string) => {
     if (page === 'add-employee') {
-      setShowAddEmployeeModal(true);
+      setShowAddEmployee(true);
     } else if (page === 'withdraw-modal') {
       setShowWithdrawModal(true);
     } else if (page === 'transaction-detail') {
@@ -200,8 +199,8 @@ export default function App() {
     <>
       {renderPage()}
 
-      {showAddEmployeeModal && (
-        <AddEmployeeModal onClose={() => setShowAddEmployeeModal(false)} />
+      {showAddEmployee && (
+        <PayveAddEmployee onClose={() => setShowAddEmployee(false)} onNavigate={handleNavigate} />
       )}
 
       {showWithdrawModal && (

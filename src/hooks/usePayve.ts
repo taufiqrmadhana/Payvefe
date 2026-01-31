@@ -120,6 +120,65 @@ export function usePayve() {
         });
     }, [writeContractAsync, address]);
 
+    // Get all employees from smart contract
+    const getEmployeeList = useCallback(async (): Promise<Array<{
+        wallet_address: string;
+        name: string;
+        salary: string;
+        balance: string;
+        is_active: boolean;
+    }>> => {
+        if (!myCompanyAddress || !publicClient) return [];
+
+        const employees: Array<{
+            wallet_address: string;
+            name: string;
+            salary: string;
+            balance: string;
+            is_active: boolean;
+        }> = [];
+
+        // Read employee list - iterate until we get an error (end of array)
+        let index = 0;
+        while (true) {
+            try {
+                const walletAddress = await publicClient.readContract({
+                    abi: PayveABI.abi,
+                    address: myCompanyAddress,
+                    functionName: 'employeeList',
+                    args: [BigInt(index)],
+                }) as `0x${string}`;
+
+                if (!walletAddress || walletAddress === '0x0000000000000000000000000000000000000000') {
+                    break;
+                }
+
+                // Get employee details
+                const employee = await publicClient.readContract({
+                    abi: PayveABI.abi,
+                    address: myCompanyAddress,
+                    functionName: 'getEmployee',
+                    args: [walletAddress],
+                }) as { salary: bigint; balance: bigint; wallet: string; name: string; isActive: boolean };
+
+                employees.push({
+                    wallet_address: walletAddress,
+                    name: employee.name || 'Unknown',
+                    salary: employee.salary.toString(),
+                    balance: employee.balance.toString(),
+                    is_active: employee.isActive,
+                });
+
+                index++;
+            } catch (e) {
+                // End of array or error
+                break;
+            }
+        }
+
+        return employees;
+    }, [myCompanyAddress, publicClient]);
+
     return {
         myCompanyAddress,
         createCompany,
@@ -129,6 +188,7 @@ export function usePayve() {
         claimInvite,
         withdraw,
         mint,
+        getEmployeeList,
         refetchCompany
     };
 }
@@ -148,7 +208,7 @@ export function usePayveData(contractAddress: string | undefined) {
     // Smart contract returns object with named properties OR tuple array depending on ABI
     // Handle both cases
     let employeeData: EmployeeData | undefined;
-    
+
     if (employee) {
         // Check if it's an object with named properties
         if (typeof employee === 'object' && 'name' in employee) {
@@ -159,7 +219,7 @@ export function usePayveData(contractAddress: string | undefined) {
                 balance: obj.balance,
                 isActive: obj.isActive,
             };
-        } 
+        }
         // Or if it's a tuple array [name, salary, balance, isActive]
         else if (Array.isArray(employee)) {
             const arr = employee as [string, bigint, bigint, boolean];

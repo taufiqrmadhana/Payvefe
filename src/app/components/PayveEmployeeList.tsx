@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { companyService } from '@/services/companyService';
 import { employeeService } from '@/services/employeeService';
+import { usePayve } from '@/hooks/usePayve';
+import { API_BASE_URL } from '@/constants';
 
 interface PayveEmployeeListProps {
   onNavigate: (page: string) => void;
@@ -28,8 +30,10 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
   const [activeTab, setActiveTab] = useState('all');
 
   const { address } = useAccount();
+  const { getEmployeeList } = usePayve();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     async function fetchEmployees() {
@@ -90,20 +94,20 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
   // Execute Payroll for selected employees
   const handleExecutePayroll = useCallback(() => {
     if (selectedEmployees.length === 0) return;
-    
+
     // Store selected employee IDs in session storage for payroll confirmation page
     const selectedData = employees.filter(e => selectedEmployees.includes(e.id));
     sessionStorage.setItem('selectedEmployeesForPayroll', JSON.stringify(selectedData));
-    
+
     onNavigate('payroll-execution');
   }, [selectedEmployees, employees, onNavigate]);
 
   // Export selected employees to CSV
   const handleExport = useCallback(() => {
-    const selectedData = selectedEmployees.length > 0 
+    const selectedData = selectedEmployees.length > 0
       ? employees.filter(e => selectedEmployees.includes(e.id))
       : employees;
-    
+
     // Create CSV content
     const headers = ['Name', 'Email', 'Department', 'Position', 'Salary (USD)', 'Location', 'Status', 'Contract End'];
     const rows = selectedData.map(emp => [
@@ -116,12 +120,12 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
       emp.status,
       emp.contract
     ]);
-    
+
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
-    
+
     // Download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -136,40 +140,40 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
 
   // Update contracts (extend by 1 year)
   const [isUpdatingContracts, setIsUpdatingContracts] = useState(false);
-  
+
   const handleUpdateContracts = useCallback(async () => {
     if (selectedEmployees.length === 0 || !address) return;
-    
+
     const confirmed = window.confirm(
       `Are you sure you want to extend contracts for ${selectedEmployees.length} employee(s) by 1 year?`
     );
-    
+
     if (!confirmed) return;
-    
+
     setIsUpdatingContracts(true);
-    
+
     try {
       const updatePromises = selectedEmployees.map(async (empId) => {
         const employee = employees.find(e => e.id === empId);
         if (!employee) return;
-        
+
         // Calculate new contract end date (1 year from current end or from today)
-        const currentEnd = employee.contract !== 'No Contract' 
-          ? new Date(employee.contract).getTime() 
+        const currentEnd = employee.contract !== 'No Contract'
+          ? new Date(employee.contract).getTime()
           : Date.now();
         const newEndDate = new Date(Math.max(currentEnd, Date.now()) + 365 * 24 * 60 * 60 * 1000);
-        
+
         await employeeService.update(empId, {
           admin_wallet_address: address,
           contract_end_date: newEndDate.toISOString().split('T')[0]
         });
       });
-      
+
       await Promise.all(updatePromises);
-      
+
       alert(`Successfully extended contracts for ${selectedEmployees.length} employee(s)`);
       setSelectedEmployees([]);
-      
+
       // Refresh employee list
       window.location.reload();
     } catch (err) {
@@ -179,6 +183,47 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
       setIsUpdatingContracts(false);
     }
   }, [selectedEmployees, employees, address]);
+
+  // Sync employees from blockchain to backend
+  const handleSyncFromChain = useCallback(async () => {
+    if (!address) return;
+
+    setIsSyncing(true);
+    try {
+      // 1. Get all employees from smart contract
+      const chainEmployees = await getEmployeeList();
+
+      if (chainEmployees.length === 0) {
+        alert('No employees found on blockchain');
+        return;
+      }
+
+      // 2. Send to backend for sync
+      const response = await fetch(`${API_BASE_URL}/api/employees/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_wallet: address,
+          employees: chainEmployees
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`Synced ${result.data.synced} employees (${result.data.created} new, ${result.data.updated} updated)`);
+        // Refresh the list
+        window.location.reload();
+      } else {
+        alert('Sync failed: ' + (result.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Sync failed:', err);
+      alert('Failed to sync from blockchain');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [address, getEmployeeList]);
 
   return (
     <div className="flex min-h-screen bg-slate-950 flex-col lg:flex-row">
@@ -194,6 +239,19 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
           onNavigate={onNavigate}
           showNotifications={true}
         >
+          <Button
+            onClick={handleSyncFromChain}
+            disabled={isSyncing}
+            variant="outline"
+            className="h-10 sm:h-11 px-4 rounded-xl border-cyan-500/30 text-cyan-400 hover:text-white hover:bg-cyan-500/20 disabled:opacity-50"
+          >
+            {isSyncing ? (
+              <Loader2 className="w-4 h-4 animate-spin sm:mr-2" />
+            ) : (
+              <RefreshCw className="w-4 h-4 sm:mr-2" />
+            )}
+            <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync from Chain'}</span>
+          </Button>
           <Button
             onClick={handleExport}
             variant="outline"
@@ -436,25 +494,25 @@ export function PayveEmployeeList({ onNavigate }: PayveEmployeeListProps) {
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur-xl rounded-2xl px-8 py-4 shadow-2xl border border-cyan-500/30 flex items-center gap-6 z-50">
               <span className="text-white font-semibold">{selectedEmployees.length} employees selected</span>
               <div className="flex gap-3">
-                <Button 
+                <Button
                   onClick={handleExecutePayroll}
                   className="h-10 px-6 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-semibold"
                 >
                   <Zap className="w-4 h-4 mr-2" />
                   Execute Payroll
                 </Button>
-                <Button 
+                <Button
                   onClick={handleExport}
-                  variant="outline" 
+                  variant="outline"
                   className="h-10 px-6 rounded-xl border-white/20 text-white hover:bg-white/10"
                 >
                   <FileDown className="w-4 h-4 mr-2" />
                   Export
                 </Button>
-                <Button 
+                <Button
                   onClick={handleUpdateContracts}
                   disabled={isUpdatingContracts}
-                  variant="outline" 
+                  variant="outline"
                   className="h-10 px-6 rounded-xl border-white/20 text-white hover:bg-white/10 disabled:opacity-50"
                 >
                   {isUpdatingContracts ? (
