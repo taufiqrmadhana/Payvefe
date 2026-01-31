@@ -26,11 +26,11 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
   const companyFromUrl = urlParams.get('company');
-  
+
   const { address, isConnected } = useAccount();
   const { connectors, connect } = useConnect();
   const { claimInvite } = usePayve();
-  
+
   const [inviteData, setInviteData] = useState<InviteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,15 +50,15 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/employees/invite/${token}`);
         const result = await response.json();
-        
+
         if (!result.success) {
           setError(result.message || 'Invite not found or expired');
           setStep('error');
           return;
         }
-        
+
         setInviteData(result.data);
-        
+
         if (result.data.status === 'active') {
           setClaimed(true);
           setStep('success');
@@ -94,21 +94,24 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
 
   const handleClaim = async () => {
     if (!inviteData || !address || !token) return;
-    
+
     setClaiming(true);
     setStep('claiming');
-    
+
     try {
       const companyAddress = companyFromUrl || inviteData.company_contract_address;
-      
+
       // Call smart contract claimInvite
       const txHash = await claimInvite(companyAddress, inviteData.secret);
-      
+
       // Notify backend
       await fetch(`${API_BASE_URL}/api/employees/claim-complete?token=${token}&wallet_address=${address}`, {
         method: 'POST',
       });
-      
+
+      // Save employer address to localStorage for employee dashboard
+      localStorage.setItem('payve_employer_address', companyAddress);
+
       setClaimed(true);
       setStep('success');
     } catch (err: any) {
@@ -142,7 +145,7 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Invalid Invite</h1>
           <p className="text-slate-400 mb-6">{error}</p>
-          <Button 
+          <Button
             onClick={() => onNavigate('landing')}
             className="bg-slate-700 hover:bg-slate-600 text-white"
           >
@@ -164,7 +167,7 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
           <h1 className="text-2xl font-bold text-white mb-2">Welcome to Payve!</h1>
           <p className="text-slate-400 mb-2">You're now connected to</p>
           <p className="text-cyan-400 font-semibold text-lg mb-6">{inviteData?.company_name}</p>
-          
+
           <div className="bg-slate-900/50 rounded-xl p-4 mb-6 text-left">
             <div className="flex justify-between mb-2">
               <span className="text-slate-500">Position</span>
@@ -181,8 +184,8 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
               </span>
             </div>
           </div>
-          
-          <Button 
+
+          <Button
             onClick={() => onNavigate('employee')}
             className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white py-3 rounded-xl"
           >
@@ -230,7 +233,7 @@ export function InvitePage({ onNavigate }: InvitePageProps) {
               <p className="text-slate-400 text-sm">Inviting you to join</p>
             </div>
           </div>
-          
+
           <div className="border-t border-white/10 pt-4 space-y-3">
             <div className="flex justify-between">
               <span className="text-slate-500">Your Name</span>

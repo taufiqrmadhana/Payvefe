@@ -22,6 +22,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
   // Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [position, setPosition] = useState('');
   const [salaryIDRX, setSalaryIDRX] = useState('6880000'); // Default ~430 USD
   const [inviteSecret, setInviteSecret] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +62,7 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
           body: JSON.stringify({
             email: email || null,
             name: name || 'New Employee',
+            position: position || null,
             secret: secret,
             company_contract_address: myCompanyAddress,
             admin_wallet: address,
@@ -217,6 +219,8 @@ export function PayveAddEmployee({ onClose, onNavigate }: PayveAddEmployeeProps)
                     <div className="relative">
                       <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                       <Input
+                        value={position}
+                        onChange={(e) => setPosition(e.target.value)}
                         placeholder="e.g. Senior Engineer"
                         className="h-13 pl-12 rounded-xl border border-white/10 focus:border-cyan-500/50 bg-slate-700/50 text-white placeholder:text-slate-500 transition-all"
                       />
